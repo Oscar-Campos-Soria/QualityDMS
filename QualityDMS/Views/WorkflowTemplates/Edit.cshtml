@@ -1,0 +1,108 @@
+﻿@model QualityDMS.Models.WorkflowTemplate
+@{
+    ViewData["Title"] = "Editar plantilla";
+}
+
+<h1>Editar plantilla: @Model.Name</h1>
+<hr />
+
+<div class="row">
+    <div class="col-md-6">
+        <form asp-action="Edit">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="TemplateId" />
+
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label asp-for="Description" class="form-label"></label>
+                <textarea asp-for="Description" class="form-control"></textarea>
+            </div>
+            <div class="mb-3">
+                <label asp-for="CategoryId" class="form-label"></label>
+                <select asp-for="CategoryId" asp-items="ViewBag.Categories" class="form-select">
+                    <option value="">-- Sin categoría --</option>
+                </select>
+            </div>
+            <div class="mb-3 form-check">
+                <input asp-for="IsDefault" class="form-check-input" />
+                <label asp-for="IsDefault" class="form-check-label"></label>
+            </div>
+            <div class="mb-3 form-check">
+                <input asp-for="IsActive" class="form-check-input" />
+                <label asp-for="IsActive" class="form-check-label"></label>
+            </div>
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            <a asp-action="Index" class="btn btn-secondary">Cancelar</a>
+        </form>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Pasos del flujo</div>
+            <div class="card-body">
+                <form asp-action="AddStep" method="post">
+                    <input type="hidden" name="templateId" value="@Model.TemplateId" />
+                    <div class="mb-2">
+                        <label>Orden</label>
+                        <input type="number" name="step.StepOrder" class="form-control" required />
+                    </div>
+                    <div class="mb-2">
+                        <label>Nombre del paso</label>
+                        <input type="text" name="step.StepName" class="form-control" required />
+                    </div>
+                    <div class="mb-2">
+                        <label>Tipo de paso</label>
+                        <select name="step.StepType" class="form-select" asp-items="Html.GetEnumSelectList<WorkflowStepType>()"></select>
+                    </div>
+                    <div class="mb-2">
+                        <label>Rol requerido</label>
+                        <input name="step.RoleRequired" class="form-control" />
+                    </div>
+                    <div class="mb-2">
+                        <label>Asignado a</label>
+                        <select name="step.AssigneeId" asp-items="ViewBag.Users" class="form-select">
+                            <option value="">-- Cualquier usuario con el rol --</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label>Días permitidos</label>
+                        <input type="number" name="step.DaysAllowed" class="form-control" value="3" />
+                    </div>
+                    <div class="form-check mb-2">
+                        <input type="checkbox" name="step.IsRequired" class="form-check-input" checked />
+                        <label class="form-check-label">Obligatorio</label>
+                    </div>
+                    <button type="submit" class="btn btn-success btn-sm">Agregar paso</button>
+                </form>
+
+                <hr />
+                <table class="table table-sm mt-3">
+                    <thead>
+                        <tr><th>Orden</th><th>Nombre</th><th>Tipo</th><th>Asignado</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var step in Model.Steps.OrderBy(s => s.StepOrder))
+                        {
+                            <tr>
+                                <td>@step.StepOrder</td>
+                                <td>@step.StepName</td>
+                                <td>@step.StepType</td>
+                                <td>@(step.Assignee?.FullName ?? step.RoleRequired ?? "—")</td>
+                                <td>
+                                    <form asp-action="RemoveStep" method="post">
+                                        <input type="hidden" name="stepId" value="@step.StepId" />
+                                        <input type="hidden" name="templateId" value="@Model.TemplateId" />
+                                        <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                                    </form>
+                                 </td>
+                            </tr>
+                            }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

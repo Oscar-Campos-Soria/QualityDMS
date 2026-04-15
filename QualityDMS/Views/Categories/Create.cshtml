@@ -1,0 +1,47 @@
+﻿@model QualityDMS.Models.DocumentCategory
+@{
+    ViewData["Title"] = ViewContext.RouteData.Values["action"]?.ToString() == "Create" ? "Nueva categoría" : "Editar categoría";
+}
+
+<h1>@ViewData["Title"]</h1>
+<hr />
+
+<div class="row">
+    <div class="col-md-6">
+        <form asp-action="@ViewContext.RouteData.Values["action"]">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="CategoryId" />
+
+            <div class="mb-3">
+                <label asp-for="Code" class="form-label"></label>
+                <input asp-for="Code" class="form-control" />
+                <span asp-validation-for="Code" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Description" class="form-label"></label>
+                <textarea asp-for="Description" class="form-control"></textarea>
+            </div>
+            <div class="mb-3">
+                <label asp-for="ParentId" class="form-label">Categoría padre</label>
+                <select asp-for="ParentId" asp-items="ViewBag.Parents" class="form-select">
+                    <option value="">-- Sin padre --</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label asp-for="RetentionYears" class="form-label"></label>
+                <input asp-for="RetentionYears" class="form-control" />
+            </div>
+            <div class="mb-3 form-check">
+                <input asp-for="IsActive" class="form-check-input" />
+                <label asp-for="IsActive" class="form-check-label"></label>
+            </div>
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <a asp-action="Index" class="btn btn-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>

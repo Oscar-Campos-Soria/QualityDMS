@@ -1,0 +1,14 @@
+﻿@model QualityDMS.Models.DocumentCategory
+@{
+    ViewData["Title"] = "Eliminar categoría";
+}
+
+<h1>Eliminar categoría</h1>
+<p>¿Está seguro de eliminar la categoría <strong>@Model.Name</strong>?</p>
+<p class="text-danger">Esta acción no se puede deshacer. Los documentos asociados quedarán sin categoría.</p>
+
+<form asp-action="Delete">
+    <input type="hidden" asp-for="CategoryId" />
+    <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancelar</a>
+</form>

@@ -1,0 +1,91 @@
+﻿@model QualityDMS.Models.ViewModels.DocumentIndexViewModel
+@{
+    ViewData["Title"] = "Documentos";
+}
+
+<h1>📄 Documentos</h1>
+
+<!-- Filtros -->
+<form method="get" asp-action="Index" class="row g-3 mb-4">
+    <div class="col-md-3">
+        <label asp-for="Filter.SearchTerm" class="form-label">Buscar</label>
+        <input asp-for="Filter.SearchTerm" class="form-control" placeholder="Título, código, etiquetas..." />
+    </div>
+    <div class="col-md-2">
+        <label asp-for="Filter.Status" class="form-label">Estado</label>
+        <select asp-for="Filter.Status" asp-items="Model.Filter.Statuses" class="form-select">
+            <option value="">Todos</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label asp-for="Filter.CategoryId" class="form-label">Categoría</label>
+        <select asp-for="Filter.CategoryId" asp-items="Model.Filter.Categories" class="form-select">
+            <option value="">Todas</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label asp-for="Filter.DepartmentId" class="form-label">Departamento</label>
+        <select asp-for="Filter.DepartmentId" asp-items="Model.Filter.Departments" class="form-select">
+            <option value="">Todos</option>
+        </select>
+    </div>
+    <div class="col-md-3 align-self-end">
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+        <a asp-action="Create" class="btn btn-success">+ Nuevo documento</a>
+    </div>
+</form>
+
+<!-- Tabla de resultados -->
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Código</th>
+                <th>Título</th>
+                <th>Versión</th>
+                <th>Estado</th>
+                <th>Categoría</th>
+                <th>Departamento</th>
+                <th>Última modificación</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var doc in Model.Documents)
+            {
+                <tr>
+                    <td>@doc.Code</td>
+                    <td>@doc.Title</td>
+                    <td>@doc.CurrentVersion</td>
+                    <td><span class="@doc.StatusBadge">@doc.StatusLabel</span></td>
+                    <td>@doc.CategoryName</td>
+                    <td>@doc.DepartmentName</td>
+                    <td>@doc.UpdatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                    <td>
+                        <a asp-action="Details" asp-route-id="@doc.DocumentId" class="btn btn-sm btn-info">Ver</a>
+                        <a asp-action="Edit" asp-route-id="@doc.DocumentId" class="btn btn-sm btn-warning">Editar</a>
+                        @if (doc.CurrentStatus == (byte)QualityDMS.Models.DocumentStatus.Aprobado)
+                        {
+                            <a asp-action="NewVersion" asp-route-id="@doc.DocumentId" class="btn btn-sm btn-secondary">Nueva versión</a>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- Paginación -->
+@if (Model.TotalPages > 1)
+{
+    <nav>
+        <ul class="pagination">
+            @for (int i = 1; i <= Model.TotalPages; i++)
+            {
+                <li class="page-item @(i == Model.PageNumber ? "active" : "")">
+                    <a class="page-link" asp-route-page="@i" asp-route-searchTerm="@Model.Filter.SearchTerm" asp-route-status="@Model.Filter.Status" asp-route-categoryId="@Model.Filter.CategoryId" asp-route-departmentId="@Model.Filter.DepartmentId">@i</a>
+                </li>
+            }
+        </ul>
+    </nav>
+}

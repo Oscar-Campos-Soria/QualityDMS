@@ -1,0 +1,69 @@
+﻿@model QualityDMS.Models.ViewModels.NewVersionViewModel
+@{
+    ViewData["Title"] = $"Nueva versión - {Model.DocumentCode}";
+}
+
+<h1>📌 Nueva versión del documento</h1>
+<p><strong>Documento:</strong> @Model.DocumentCode - @Model.DocumentTitle</p>
+<p><strong>Versión actual:</strong> @Model.CurrentVersion → <strong>Nueva versión propuesta:</strong> @Model.ProposedVersion</p>
+<hr />
+
+<div class="row">
+    <div class="col-md-8">
+        <form asp-action="NewVersion" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="DocumentId" />
+            <input type="hidden" asp-for="ProposedVersion" />
+
+            <div class="mb-3">
+                <label asp-for="VersionType" class="form-label"></label>
+                <select asp-for="VersionType" asp-items="Html.GetEnumSelectList<VersionType>()" class="form-select"></select>
+                <small class="form-text text-muted">Mayor: cambio incompatible. Menor: nueva funcionalidad. Parche: corrección.</small>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="File" class="form-label"></label>
+                <input asp-for="File" type="file" class="form-control" accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.dwg,.dxf,.png,.jpg" />
+                <span asp-validation-for="File" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="ChangeLog" class="form-label"></label>
+                <textarea asp-for="ChangeLog" class="form-control" rows="4" placeholder="Describa los cambios realizados en esta versión..."></textarea>
+                <span asp-validation-for="ChangeLog" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="WorkflowTemplateId" class="form-label"></label>
+                <select asp-for="WorkflowTemplateId" asp-items="Model.WorkflowTemplates" class="form-select">
+                    <option value="">-- Seleccione un flujo --</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="EffectiveDate" class="form-label"></label>
+                <input asp-for="EffectiveDate" type="date" class="form-control" />
+                <small class="form-text text-muted">Fecha a partir de la cual la versión es efectiva (opcional).</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Crear nueva versión</button>
+            <a asp-action="Details" asp-route-id="@Model.DocumentId" class="btn btn-secondary">Cancelar</a>
+        </form>
+    </div>
+    <div class="col-md-4">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Al crear una nueva versión:
+            <ul class="mt-2">
+                <li>El documento pasará a estado "En revisión" (o el primer paso del flujo).</li>
+                <li>Se notificará a los aprobadores.</li>
+                <li>La versión anterior permanecerá disponible en el historial.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

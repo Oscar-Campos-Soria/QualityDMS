@@ -1,0 +1,38 @@
+﻿@model IEnumerable<QualityDMS.Models.DocumentCategory>
+@{
+    ViewData["Title"] = "Categorías de documentos";
+}
+
+<h1>📂 Categorías</h1>
+<p>
+    <a asp-action="Create" class="btn btn-primary">+ Nueva categoría</a>
+</p>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Padre</th>
+            <th>Vigencia (años)</th>
+            <th>Activa</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var cat in Model)
+        {
+            <tr>
+                <td>@cat.Code</td>
+                <td>@cat.Name</td>
+                <td>@(cat.Parent?.Name ?? "—")</td>
+                <td>@cat.RetentionYears</td>
+                <td>@(cat.IsActive ? "Sí" : "No")</td>
+                <td>
+                    <a asp-action="Edit" asp-route-id="@cat.CategoryId" class="btn btn-sm btn-warning">Editar</a>
+                    <a asp-action="Delete" asp-route-id="@cat.CategoryId" class="btn btn-sm btn-danger">Eliminar</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

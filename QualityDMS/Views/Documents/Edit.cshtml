@@ -1,0 +1,57 @@
+﻿@model QualityDMS.Models.ViewModels.DocumentEditViewModel
+@{
+    ViewData["Title"] = "Editar documento";
+}
+
+<h1>✏️ Editar documento</h1>
+<hr />
+
+<div class="row">
+    <div class="col-md-6">
+        <form asp-action="Edit" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="DocumentId" />
+
+            <div class="mb-3">
+                <label asp-for="Title" class="form-label"></label>
+                <input asp-for="Title" class="form-control" />
+                <span asp-validation-for="Title" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Description" class="form-label"></label>
+                <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <label asp-for="CategoryId" class="form-label"></label>
+                    <select asp-for="CategoryId" asp-items="Model.Categories" class="form-select"></select>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="DepartmentId" class="form-label"></label>
+                    <select asp-for="DepartmentId" asp-items="Model.Departments" class="form-select"></select>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Tags" class="form-label"></label>
+                <input asp-for="Tags" class="form-control" />
+            </div>
+            <div class="mb-3 form-check">
+                <input asp-for="IsConfidential" class="form-check-input" />
+                <label asp-for="IsConfidential" class="form-check-label"></label>
+            </div>
+            <div class="mb-3">
+                <label asp-for="NextReviewDate" class="form-label"></label>
+                <input asp-for="NextReviewDate" type="date" class="form-control" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            <a asp-action="Details" asp-route-id="@Model.DocumentId" class="btn btn-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

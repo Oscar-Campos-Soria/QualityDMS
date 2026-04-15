@@ -1,0 +1,14 @@
+﻿@model QualityDMS.Models.Department
+@{
+    ViewData["Title"] = "Eliminar departamento";
+}
+
+<h1>Eliminar departamento</h1>
+<p>¿Está seguro de eliminar el departamento <strong>@Model.Name</strong>?</p>
+<p class="text-danger">Los usuarios y documentos asociados quedarán sin departamento.</p>
+
+<form asp-action="Delete">
+    <input type="hidden" asp-for="DepartmentId" />
+    <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancelar</a>
+</form>

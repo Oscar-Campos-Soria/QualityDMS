@@ -1,0 +1,21 @@
+﻿@{
+    ViewData["Title"] = "Cerrar sesión";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card mt-5">
+            <div class="card-header bg-warning text-dark">
+                <h4><i class="bi bi-box-arrow-right"></i> Cerrar sesión</h4>
+            </div>
+            <div class="card-body">
+                <p>¿Estás seguro de que deseas cerrar tu sesión?</p>
+                <form asp-action="LogoutConfirmed" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-danger">Sí, cerrar sesión</button>
+                    <a href="@Url.Action("Index", "Home")" class="btn btn-secondary">Cancelar</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

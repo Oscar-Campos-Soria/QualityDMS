@@ -1,0 +1,31 @@
+﻿@model IEnumerable<QualityDMS.Models.Department>
+@{
+    ViewData["Title"] = "Departamentos";
+}
+
+<h1>🏢 Departamentos</h1>
+<p>
+    <a asp-action="Create" class="btn btn-primary">+ Nuevo departamento</a>
+</p>
+
+<table class="table table-striped">
+    <thead>
+        <tr><th>Código</th><th>Nombre</th><th>Descripción</th><th>Gerente</th><th>Activo</th><th></th></tr>
+    </thead>
+    <tbody>
+        @foreach (var dep in Model)
+        {
+            <tr>
+                <td>@dep.Code</td>
+                <td>@dep.Name</td>
+                <td>@dep.Description</td>
+                <td>@dep.ManagerName</td>
+                <td>@(dep.IsActive ? "Sí" : "No")</td>
+                <td>
+                    <a asp-action="Edit" asp-route-id="@dep.DepartmentId" class="btn btn-sm btn-warning">Editar</a>
+                    <a asp-action="Delete" asp-route-id="@dep.DepartmentId" class="btn btn-sm btn-danger">Eliminar</a>
+                 </td>
+             </tr>
+            }
+    </tbody>
+</table>

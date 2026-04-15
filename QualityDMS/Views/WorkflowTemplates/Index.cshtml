@@ -1,0 +1,30 @@
+﻿@model IEnumerable<QualityDMS.Models.WorkflowTemplate>
+@{
+    ViewData["Title"] = "Plantillas de flujo";
+}
+
+<h1>⚙️ Plantillas de flujo</h1>
+<p>
+    <a asp-action="Create" class="btn btn-primary">+ Nueva plantilla</a>
+</p>
+
+<table class="table table-striped">
+    <thead>
+        <tr><th>Nombre</th><th>Categoría</th><th>Pasos</th><th>Activa</th><th></th></tr>
+    </thead>
+    <tbody>
+        @foreach (var t in Model)
+        {
+            <tr>
+                <td>@t.Name</td>
+                <td>@t.Category?.Name</td>
+                <td>@t.Steps.Count</td>
+                <td>@(t.IsActive ? "Sí" : "No")</td>
+                <td>
+                    <a asp-action="Edit" asp-route-id="@t.TemplateId" class="btn btn-sm btn-warning">Editar</a>
+                    <a asp-action="Delete" asp-route-id="@t.TemplateId" class="btn btn-sm btn-danger">Eliminar</a>
+                 </td>
+            </tr>
+            }
+    </tbody>
+</table>

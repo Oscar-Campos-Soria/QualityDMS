@@ -1,0 +1,181 @@
+﻿@model QualityDMS.Models.ViewModels.DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="display-5">Bienvenido, @User.Identity?.Name</h1>
+        <p class="lead">Resumen del sistema de gestión documental</p>
+    </div>
+</div>
+
+<!-- Tarjetas de métricas -->
+<div class="row mt-4 g-3">
+    <div class="col-md-2">
+        <div class="card text-bg-primary">
+            <div class="card-body">
+                <h5 class="card-title">Total</h5>
+                <p class="card-text display-6">@Model.TotalDocuments</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-bg-secondary">
+            <div class="card-body">
+                <h5 class="card-title">Borradores</h5>
+                <p class="card-text display-6">@Model.Borradores</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-bg-info">
+            <div class="card-body">
+                <h5 class="card-title">En Revisión</h5>
+                <p class="card-text display-6">@Model.EnRevision</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-bg-warning">
+            <div class="card-body">
+                <h5 class="card-title">En Aprobación</h5>
+                <p class="card-text display-6">@Model.EnAprobacion</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-bg-success">
+            <div class="card-body">
+                <h5 class="card-title">Aprobados</h5>
+                <p class="card-text display-6">@Model.Aprobados</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-bg-danger">
+            <div class="card-body">
+                <h5 class="card-title">Obsoletos</h5>
+                <p class="card-text display-6">@Model.Obsoletos</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pendientes de aprobación -->
+<div class="row mt-5">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-hourglass-split"></i> Aprobaciones pendientes
+            </div>
+            <div class="card-body">
+                @if (Model.PendingApprovals.Any())
+                {
+                    <div class="list-group">
+                        @foreach (var item in Model.PendingApprovals)
+                        {
+                            <a href="@Url.Action("Approve", "Workflow", new { instanceId = item.InstanceId })" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">@item.DocumentCode - @item.DocumentTitle</h5>
+                                    <small>Vence: @item.DueDate.ToLocalTime().ToString("dd/MM/yyyy")</small>
+                                </div>
+                                <p class="mb-1">Paso: @item.StepName (v@item.VersionNumber)</p>
+                                <small>Solicitado por: @item.InitiatedBy</small>
+                            </a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">No hay tareas pendientes.</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Notificaciones recientes -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <i class="bi bi-bell"></i> Notificaciones recientes
+            </div>
+            <div class="card-body">
+                @if (Model.RecentNotifications.Any())
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var n in Model.RecentNotifications)
+                        {
+                            <li class="list-group-item @(n.IsRead ? "" : "fw-bold")">
+                                <div>@n.Title</div>
+                                <small class="text-muted">@n.CreatedAt.ToLocalTime().ToString("g")</small>
+                                @if (!n.IsRead)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary float-end mark-read" data-id="@n.NotificationId">Marcar leída</button>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p class="text-muted">Sin notificaciones.</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Próximas revisiones -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <i class="bi bi-calendar-check"></i> Documentos por vencer (próximos 30 días)
+            </div>
+            <div class="card-body">
+                @if (Model.UpcomingReviews.Any())
+                {
+                    <table class="table table-sm">
+                        <thead>
+                            <tr><th>Código</th><th>Título</th><th>Versión</th><th>Revisión</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var doc in Model.UpcomingReviews)
+                            {
+                                <tr>
+                                    <td>@doc.Code</td>
+                                    <td>@doc.Title</td>
+                                    <td>@doc.CurrentVersion</td>
+                                    <td>@doc.NextReviewDate?.ToShortDateString()</td>
+                                    <td><a href="@Url.Action("Details", "Documents", new { id = doc.DocumentId })" class="btn btn-sm btn-outline-primary">Ver</a></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">No hay documentos próximos a vencer.</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.mark-read').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const id = this.dataset.id;
+                await fetch('@Url.Action("MarkNotificationRead", "Home")', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(id)
+                });
+                this.closest('.list-group-item').classList.remove('fw-bold');
+                this.remove();
+            });
+        });
+    </script>
+}
