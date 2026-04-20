@@ -38,9 +38,14 @@ public interface IAuditLogService
 
 public interface INotificationService
 {
+    // Métodos originales
     Task SendAsync(string userId, string title, string message, byte type = 1,
         string? entityType = null, string? entityId = null);
     Task NotifyDocumentStatusChangeAsync(int versionId, WorkflowActionType action, string actorId);
+
+    // Nuevos métodos (integrados desde tu versión adicional)
+    Task NotifyUserAsync(string userId, string title, string message, string? entityType = null, string? entityId = null);
+    Task NotifyApproversAsync(int workflowInstanceId, string stepName, DateTime dueDate);
 }
 
 // =========================================================================
@@ -83,7 +88,6 @@ public class WorkflowService : IWorkflowService
         _db.WorkflowInstances.Add(instance);
         await _db.SaveChangesAsync();
 
-        // Notificar al responsable del primer paso
         var firstStep = template.Steps.FirstOrDefault(s => s.StepOrder == 1);
         if (firstStep?.AssigneeId is not null)
         {
@@ -126,7 +130,6 @@ public class WorkflowService : IWorkflowService
         await using var tx = await _db.Database.BeginTransactionAsync();
         try
         {
-            // Registrar acción
             _db.WorkflowActions.Add(new WorkflowAction
             {
                 InstanceId = instance.InstanceId,
@@ -145,7 +148,7 @@ public class WorkflowService : IWorkflowService
                 .FirstAsync(v => v.VersionId == versionId);
 
             if (actionType == WorkflowActionType.Rechazado ||
-                actionType == WorkflowActionType.SolicitoSambios)
+                actionType == WorkflowActionType.SolicitoCambios)  // ← Corregido
             {
                 instance.Status = WorkflowInstanceStatus.Rechazado;
                 instance.CompletedAt = DateTime.UtcNow;
@@ -363,15 +366,19 @@ public class AuditLogService : IAuditLogService
 }
 
 // =========================================================================
-// NotificationService (VERSIÓN CORRECTA - ÚNICA)
+// NotificationService (UNIFICADA)
 // =========================================================================
 
 public class NotificationService : INotificationService
 {
     private readonly ApplicationDbContext _db;
 
-    public NotificationService(ApplicationDbContext db) => _db = db;
+    public NotificationService(ApplicationDbContext db)
+    {
+        _db = db;
+    }
 
+    // Método original (SendAsync)
     public async Task SendAsync(string userId, string title, string message, byte type = 1,
         string? entityType = null, string? entityId = null)
     {
@@ -388,6 +395,7 @@ public class NotificationService : INotificationService
         await _db.SaveChangesAsync();
     }
 
+    // Método original (NotifyDocumentStatusChangeAsync)
     public async Task NotifyDocumentStatusChangeAsync(int versionId, WorkflowActionType action, string actorId)
     {
         var version = await _db.DocumentVersions
@@ -401,7 +409,7 @@ public class NotificationService : INotificationService
         {
             WorkflowActionType.Aprobado => "fue aprobado ✅",
             WorkflowActionType.Rechazado => "fue rechazado ❌",
-            WorkflowActionType.SolicitoSambios => "requiere cambios ✏️",
+            WorkflowActionType.SolicitoCambios => "requiere cambios ✏️",
             _ => "fue actualizado"
         };
 
@@ -415,5 +423,33 @@ public class NotificationService : INotificationService
             type: action == WorkflowActionType.Aprobado ? (byte)1 : (byte)2,
             entityType: "Document",
             entityId: version.Document.DocumentId.ToString());
+    }
+
+    // Nuevo método (NotifyUserAsync) - es un alias de SendAsync
+    public async Task NotifyUserAsync(string userId, string title, string message, string? entityType = null, string? entityId = null)
+    {
+        await SendAsync(userId, title, message, type: 1, entityType, entityId);
+    }
+
+    // Nuevo método (NotifyApproversAsync)
+    public async Task NotifyApproversAsync(int workflowInstanceId, string stepName, DateTime dueDate)
+    {
+        // Usando FirstOrDefaultAsync con Microsoft.EntityFrameworkCore (asegúrate de tener el using)
+        var instance = await _db.WorkflowInstances
+            .Include(i => i.Template!)
+                .ThenInclude(t => t.Steps)
+            .Include(i => i.Version)
+                .ThenInclude(v => v.Document)
+            .FirstOrDefaultAsync(i => i.InstanceId == workflowInstanceId);
+
+        if (instance == null) return;
+
+        var currentStep = instance.Template?.Steps.FirstOrDefault(s => s.StepOrder == instance.CurrentStep);
+        if (currentStep == null || string.IsNullOrEmpty(currentStep.AssigneeId)) return;
+
+        var title = $"Nueva tarea: {instance.Version.Document.Code} - {stepName}";
+        var message = $"Debe revisar el documento '{instance.Version.Document.Title}' versión {instance.Version.VersionNumber}. Fecha límite: {dueDate.ToLocalTime():dd/MM/yyyy HH:mm}.";
+
+        await NotifyUserAsync(currentStep.AssigneeId, title, message, "WorkflowInstance", workflowInstanceId.ToString());
     }
 }

@@ -36,7 +36,7 @@ namespace QualityDMS.Models
     {
         Aprobado = 1,
         Rechazado = 2,
-        SolicitoSambios = 3,
+        SolicitoCambios = 3,  // Corregido el nombre (estaba "SolicitoSambios")
         Delegado = 4,
         Omitido = 5
     }
@@ -84,6 +84,7 @@ namespace QualityDMS.Models
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 
+    [Table("AspNetUsers")]  // Identity ya usa este nombre, pero por claridad
     public class ApplicationUser : IdentityUser
     {
         [Required, MaxLength(200)]
@@ -92,7 +93,7 @@ namespace QualityDMS.Models
         [MaxLength(150)]
         public string? Position { get; set; }
 
-        public string? Signature { get; set; }   // Base64
+        public string? Signature { get; set; }
 
         public int? DepartmentId { get; set; }
 
@@ -106,8 +107,10 @@ namespace QualityDMS.Models
         public ICollection<DocumentVersion> AuthoredVersions { get; set; } = [];
     }
 
+    [Table("Departments")]
     public class Department : BaseEntity
     {
+        [Key]
         public int DepartmentId { get; set; }
 
         [Required, MaxLength(20)]
@@ -128,8 +131,10 @@ namespace QualityDMS.Models
         public ICollection<ApplicationUser> Users { get; set; } = [];
     }
 
+    [Table("DocumentCategories")]
     public class DocumentCategory : BaseEntity
     {
+        [Key]
         public int CategoryId { get; set; }
 
         [Required, MaxLength(20)]
@@ -153,8 +158,10 @@ namespace QualityDMS.Models
         public ICollection<Document> Documents { get; set; } = [];
     }
 
+    [Table("Documents")]
     public class Document : BaseEntity
     {
+        [Key]
         public int DocumentId { get; set; }
 
         [Required, MaxLength(50)]
@@ -188,7 +195,7 @@ namespace QualityDMS.Models
         [MaxLength(20)]
         public string CurrentVersion { get; set; } = "0.1";
 
-        public string? Tags { get; set; }   // JSON array
+        public string? Tags { get; set; }
         public bool IsConfidential { get; set; } = false;
         public DateOnly? NextReviewDate { get; set; }
 
@@ -222,8 +229,10 @@ namespace QualityDMS.Models
         };
     }
 
+    [Table("DocumentVersions")]
     public class DocumentVersion : BaseEntity
     {
+        [Key]
         public int VersionId { get; set; }
 
         public int DocumentId { get; set; }
@@ -305,6 +314,7 @@ namespace QualityDMS.Models
         };
     }
 
+    [Table("WorkflowTemplates")]
     public class WorkflowTemplate : BaseEntity
     {
         [Key]
@@ -330,6 +340,7 @@ namespace QualityDMS.Models
         public ICollection<WorkflowTemplateStep> Steps { get; set; } = [];
     }
 
+    [Table("WorkflowTemplateSteps")]
     public class WorkflowTemplateStep
     {
         [Key]
@@ -356,6 +367,7 @@ namespace QualityDMS.Models
         public bool IsRequired { get; set; } = true;
     }
 
+    [Table("WorkflowInstances")]
     public class WorkflowInstance
     {
         [Key]
@@ -381,6 +393,7 @@ namespace QualityDMS.Models
         public ICollection<WorkflowAction> Actions { get; set; } = [];
     }
 
+    [Table("WorkflowActions")]
     public class WorkflowAction
     {
         [Key]
@@ -409,6 +422,7 @@ namespace QualityDMS.Models
         public DateTime? DueDate { get; set; }
     }
 
+    [Table("Audits")]   // ← Nombre real de la tabla en el script SQL
     public class QualityAudit : BaseEntity
     {
         [Key]
@@ -451,6 +465,7 @@ namespace QualityDMS.Models
         public ICollection<AuditFinding> Findings { get; set; } = [];
     }
 
+    [Table("AuditFindings")]
     public class AuditFinding
     {
         [Key]
@@ -495,8 +510,10 @@ namespace QualityDMS.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
+    [Table("AuditLog")]
     public class AuditLog
     {
+        [Key]
         public long LogId { get; set; }
 
         [Required, MaxLength(100)]
@@ -526,6 +543,7 @@ namespace QualityDMS.Models
         public string? AdditionalInfo { get; set; }
     }
 
+    [Table("Notifications")]
     public class Notification
     {
         [Key]

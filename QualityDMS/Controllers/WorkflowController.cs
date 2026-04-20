@@ -1,9 +1,12 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QualityDMS.Data;
 using QualityDMS.Models;
 using QualityDMS.Models.ViewModels;
+using QualityDMS.Services;
+using System.Security.Claims;
 
 namespace QualityDMS.Controllers;
 
@@ -11,48 +14,39 @@ namespace QualityDMS.Controllers;
 public class WorkflowController : Controller
 {
     private readonly ApplicationDbContext _context;
-    private readonly IWebHostEnvironment _env;
+    private readonly IWorkflowService _workflowService;
+    private readonly INotificationService _notificationService;
+    private readonly IAuditLogService _auditLogService;
+    private readonly IFileStorageService _fileStorageService;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public WorkflowController(ApplicationDbContext context, IWebHostEnvironment env)
+    public WorkflowController(
+        ApplicationDbContext context,
+        IWorkflowService workflowService,
+        INotificationService notificationService,
+        IAuditLogService auditLogService,
+        IFileStorageService fileStorageService,
+        UserManager<ApplicationUser> userManager)
     {
         _context = context;
-        _env = env;
+        _workflowService = workflowService;
+        _notificationService = notificationService;
+        _auditLogService = auditLogService;
+        _fileStorageService = fileStorageService;
+        _userManager = userManager;
     }
 
-    // GET: /Workflow/MyPendingApprovals
-    public async Task<IActionResult> MyPendingApprovals()
+    // GET: /Workflow/Pending (renombrada desde MyPendingApprovals)
+    public async Task<IActionResult> Pending()
     {
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userId))
             return Challenge();
 
-        // Buscar instancias de flujo donde el usuario sea el asignado del paso actual
-        var pending = await (from wi in _context.WorkflowInstances
-                             join wts in _context.WorkflowTemplateSteps
-                                 on wi.TemplateId equals wts.TemplateId
-                             where wi.Status == WorkflowInstanceStatus.EnCurso
-                                 && wi.CurrentStep == wts.StepOrder
-                                 && wts.AssigneeId == userId
-                             join dv in _context.DocumentVersions on wi.VersionId equals dv.VersionId
-                             join d in _context.Documents on dv.DocumentId equals d.DocumentId
-                             join u in _context.Users on wi.InitiatedBy equals u.Id
-                             select new PendingApprovalDto
-                             {
-                                 InstanceId = wi.InstanceId,
-                                 VersionId = dv.VersionId,
-                                 DocumentId = d.DocumentId,
-                                 DocumentCode = d.Code,
-                                 DocumentTitle = d.Title,
-                                 VersionNumber = dv.VersionNumber,
-                                 StepName = wts.StepName,
-                                 StepType = (byte)wts.StepType,
-                                 CurrentStep = wi.CurrentStep,
-                                 StartedAt = wi.StartedAt,
-                                 DueDate = wi.StartedAt.AddDays(wts.DaysAllowed),
-                                 InitiatedBy = u.FullName ?? u.UserName ?? ""
-                             })
-                             .ToListAsync();
+        var user = await _userManager.FindByIdAsync(userId);
+        var roles = await _userManager.GetRolesAsync(user);
 
+        var pending = await _workflowService.GetPendingApprovalsAsync(userId, roles);
         return View(pending);
     }
 
@@ -73,7 +67,7 @@ public class WorkflowController : Controller
         if (currentStep == null)
             return NotFound("No se encontró el paso actual del flujo");
 
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (currentStep.AssigneeId != userId)
             return Forbid();
 
@@ -99,92 +93,73 @@ public class WorkflowController : Controller
         if (!ModelState.IsValid)
             return View(model);
 
-        var instance = await _context.WorkflowInstances
-            .Include(i => i.Version)
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+            return Challenge();
+
+        var result = await _workflowService.ProcessActionAsync(
+            model.VersionId,
+            userId,
+            model.ActionType,
+            model.Comments,
+            model.SignatureData);
+
+        if (result.Success)
+        {
+            TempData["Success"] = result.Message;
+            // Registrar en auditoría
+            await _auditLogService.LogAsync("Workflow", model.InstanceId.ToString(), "Approve",
+                null, $"ActionType: {model.ActionType}", userId);
+        }
+        else
+        {
+            TempData["Error"] = result.Message;
+        }
+
+        return RedirectToAction(nameof(Pending));
+    }
+
+    // GET: /Workflow/History/{documentId}
+    public async Task<IActionResult> History(int documentId)
+    {
+        var instances = await _context.WorkflowInstances
             .Include(i => i.Template)
-                .ThenInclude(t => t.Steps)
-            .FirstOrDefaultAsync(i => i.InstanceId == model.InstanceId);
+            .Include(i => i.Actions)
+                .ThenInclude(a => a.Actor)
+            .Include(i => i.Version)
+            .Where(i => i.Version.DocumentId == documentId)
+            .OrderByDescending(i => i.StartedAt)
+            .ToListAsync();
 
-        if (instance == null)
+        ViewBag.DocumentId = documentId;
+        return View(instances);
+    }
+
+    // GET: /Workflow/DownloadVersion/{versionId}
+    // (opcional, para que el aprobador descargue el archivo sin salir del flujo)
+    public async Task<IActionResult> DownloadVersion(int versionId)
+    {
+        var version = await _context.DocumentVersions
+            .Include(v => v.Document)
+            .FirstOrDefaultAsync(v => v.VersionId == versionId);
+
+        if (version == null)
             return NotFound();
 
-        var currentStep = instance.Template?.Steps.FirstOrDefault(s => s.StepOrder == instance.CurrentStep);
-        if (currentStep == null)
-            return NotFound();
+        // Verificar que el usuario actual sea el asignado de algún paso activo
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var isPending = await _context.WorkflowInstances
+            .AnyAsync(i => i.VersionId == versionId &&
+                           i.Status == WorkflowInstanceStatus.EnCurso &&
+                           i.Template.Steps.Any(s => s.StepOrder == i.CurrentStep && s.AssigneeId == userId));
 
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (currentStep.AssigneeId != userId)
+        if (!isPending && !User.IsInRole("Admin") && !User.IsInRole("QualityManager"))
             return Forbid();
 
-        // Registrar la acción
-        var action = new WorkflowAction
-        {
-            InstanceId = instance.InstanceId,
-            StepOrder = instance.CurrentStep,
-            StepName = currentStep.StepName,
-            StepType = currentStep.StepType,
-            ActionType = model.ActionType,
-            ActorId = userId!,
-            Comments = model.Comments,
-            SignatureData = model.SignatureData,
-            ActedAt = DateTime.UtcNow
-        };
-        _context.WorkflowActions.Add(action);
+        var fileBytes = await _fileStorageService.GetFileAsync(version.FilePath);
+        if (fileBytes == null)
+            return NotFound("El archivo no se encuentra en el servidor.");
 
-        // Si la acción es rechazar o solicitar cambios
-        if (model.ActionType == WorkflowActionType.Rechazado || model.ActionType == WorkflowActionType.SolicitoSambios)
-        {
-            instance.Status = WorkflowInstanceStatus.Rechazado;
-            instance.CompletedAt = DateTime.UtcNow;
-
-            // Cambiar estado del documento a Borrador (para que pueda corregirse)
-            var doc = await _context.Documents.FindAsync(instance.Version.DocumentId);
-            if (doc != null)
-                doc.CurrentStatus = DocumentStatus.Borrador;
-
-            await _context.SaveChangesAsync();
-            TempData["Mensaje"] = "Documento rechazado. Se notificará al autor.";
-            return RedirectToAction(nameof(MyPendingApprovals));
-        }
-
-        // Si es aprobado, avanzar al siguiente paso
-        var nextStepOrder = instance.CurrentStep + 1;
-        var nextStep = instance.Template?.Steps.FirstOrDefault(s => s.StepOrder == nextStepOrder);
-
-        if (nextStep == null)
-        {
-            // No hay más pasos: flujo completado
-            instance.Status = WorkflowInstanceStatus.Completado;
-            instance.CompletedAt = DateTime.UtcNow;
-
-            // Actualizar estado del documento y versión a Aprobado
-            var doc = await _context.Documents.FindAsync(instance.Version.DocumentId);
-            if (doc != null)
-            {
-                doc.CurrentStatus = DocumentStatus.Aprobado;
-                doc.CurrentVersionId = instance.VersionId;
-                doc.CurrentVersion = instance.Version.VersionNumber;
-                doc.UpdatedAt = DateTime.UtcNow;
-            }
-
-            var version = await _context.DocumentVersions.FindAsync(instance.VersionId);
-            if (version != null)
-            {
-                version.Status = DocumentStatus.Aprobado;
-                version.PublishedAt = DateTime.UtcNow;
-                version.ApprovedById = userId;
-                version.ApprovedAt = DateTime.UtcNow;
-            }
-
-            await _context.SaveChangesAsync();
-            TempData["Mensaje"] = "Documento aprobado y publicado correctamente.";
-            return RedirectToAction(nameof(MyPendingApprovals));
-        }
-
-        // Avanzar al siguiente paso
-        instance.CurrentStep = nextStepOrder;
-        await _context.SaveChangesAsync();
-        TempData["Mensaje"] = $"Aprobado. Siguiente paso: {nextStep.StepName}.";
-        return RedirectToAction(nameof(MyPendingApprovals));
+        return File(fileBytes, version.ContentType, version.OriginalFileName);
     }
 }

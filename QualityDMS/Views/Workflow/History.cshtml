@@ -1,0 +1,83 @@
+﻿@model List<WorkflowInstance>
+@{
+    var documentId = ViewBag.DocumentId;
+    ViewData["Title"] = "Historial de flujos";
+}
+
+<h1><i class="bi bi-journal-bookmark-fill"></i> Historial de flujos</h1>
+<hr />
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">Este documento no tiene historial de flujos.</div>
+}
+else
+{
+    @foreach (var instance in Model)
+    {
+        <div class="card mb-3 shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                <strong>Flujo:</strong> @(instance.Template?.Name ?? "Plantilla no definida") |
+                <strong>Iniciado:</strong> @instance.StartedAt.ToLocalTime().ToString("g") |
+                <strong>Estado:</strong>
+                @if (instance.Status == WorkflowInstanceStatus.EnCurso)
+                {
+                    <span class="badge bg-info">En curso</span>
+                }
+                else if (instance.Status == WorkflowInstanceStatus.Completado)
+                {
+
+                    <span class="badge bg-success">Completado</span>
+                }
+                else if (instance.Status == WorkflowInstanceStatus.Rechazado)
+                {
+
+                    <span class="badge bg-danger">Rechazado</span>
+                }
+                else
+                {
+
+                    <span class="badge bg-secondary">Cancelado</span>
+                }
+            </div>
+            <div class="card-body">
+                @if (instance.Actions.Any())
+                {
+                    <div class="timeline">
+                        @foreach (var action in instance.Actions.OrderBy(a => a.ActedAt))
+                        {
+                            <div class="mb-3 pb-2 border-bottom">
+                                <div class="d-flex justify-content-between">
+                                    <strong>@action.StepName</strong>
+                                    <small class="text-muted">@action.ActedAt.ToLocalTime().ToString("g")</small>
+                                </div>
+                                <div>
+                                    Acción:
+                                    <span class="badge @(action.ActionType == WorkflowActionType.Aprobado ? "bg-success" : "bg-danger")">
+                                        @action.ActionType
+                                    </span>
+                                </div>
+                                <div>Actor: @action.Actor?.FullName (@action.Actor?.Email)</div>
+                                @if (!string.IsNullOrEmpty(action.Comments))
+                                {
+                                    <div class="mt-1 p-2 bg-light rounded">
+                                        <em>Comentario:</em> @action.Comments
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">Sin acciones registradas.</p>
+                }
+            </div>
+        </div>
+    }
+}
+<div class="mt-3">
+    <a asp-action="Details" asp-controller="Documents" asp-route-id="@documentId" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Volver al documento
+    </a>
+</div>

@@ -9,7 +9,6 @@
   <ItemGroup>
     <Folder Include="Data\NewFolder\" />
     <Folder Include="NewFolder\" />
-    <Folder Include="Views\Audits\" />
   </ItemGroup>
 
   <ItemGroup>

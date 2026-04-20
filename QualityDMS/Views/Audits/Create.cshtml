@@ -1,0 +1,70 @@
+﻿@model AuditCreateViewModel
+@{
+    ViewData["Title"] = "Nueva auditoría";
+}
+
+<h1><i class="bi bi-plus-circle"></i> Nueva auditoría</h1>
+<hr />
+
+<div class="row">
+    <div class="col-md-6">
+        <form asp-action="Create" method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+            <div class="mb-3">
+                <label asp-for="Title" class="form-label"></label>
+                <input asp-for="Title" class="form-control" />
+                <span asp-validation-for="Title" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="AuditType" class="form-label"></label>
+                <select asp-for="AuditType" class="form-select" asp-items="Html.GetEnumSelectList<AuditType>()"></select>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Standard" class="form-label"></label>
+                <input asp-for="Standard" class="form-control" placeholder="ISO 9001:2015" />
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Scope" class="form-label"></label>
+                <textarea asp-for="Scope" class="form-control" rows="3"></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="DepartmentId" class="form-label"></label>
+                <select asp-for="DepartmentId" asp-items="Model.Departments" class="form-select">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="LeadAuditorId" class="form-label"></label>
+                <select asp-for="LeadAuditorId" asp-items="Model.Auditors" class="form-select"></select>
+                <span asp-validation-for="LeadAuditorId" class="text-danger"></span>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <label asp-for="PlannedStart" class="form-label"></label>
+                    <input asp-for="PlannedStart" type="date" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="PlannedEnd" class="form-label"></label>
+                    <input asp-for="PlannedEnd" type="date" class="form-control" />
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Crear auditoría</button>
+            <a asp-action="Index" class="btn btn-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
