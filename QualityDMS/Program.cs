@@ -16,23 +16,18 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // ── ASP.NET Core Identity ─────────────────────────────────────
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
-    // Contraseña
     options.Password.RequiredLength = 8;
     options.Password.RequireDigit = true;
     options.Password.RequireUppercase = true;
     options.Password.RequireNonAlphanumeric = false;
-    // Bloqueo
     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
     options.Lockout.MaxFailedAccessAttempts = 5;
-    // Usuario
     options.User.RequireUniqueEmail = true;
-    // Email
-    options.SignIn.RequireConfirmedEmail = false; // true en producción
+    options.SignIn.RequireConfirmedEmail = false;
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// Configuración de cookies de autenticación
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login";
@@ -51,7 +46,6 @@ builder.Services.AddControllersWithViews(options =>
     options.Filters.Add(new Microsoft.AspNetCore.Mvc.Authorization.AuthorizeFilter());
 });
 
-// Razor Runtime Compilation (útil en dev)
 if (builder.Environment.IsDevelopment())
     builder.Services.AddRazorPages().AddRazorRuntimeCompilation();
 
@@ -71,7 +65,7 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
-// ── CORS ─────────────────────────────────────────────────────
+// ── CORS ──────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("InternalOnly", policy =>
@@ -91,7 +85,7 @@ builder.Services.AddAntiforgery(options =>
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
-if (!builder.Environment.IsDevelopment())
+if (!builder.Environment.IsDevelopment() && OperatingSystem.IsWindows())
     builder.Logging.AddEventLog();
 
 var app = builder.Build();
@@ -115,7 +109,6 @@ app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Rutas
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
@@ -127,102 +120,82 @@ app.MapControllerRoute(
 
 // ── Seed ──────────────────────────────────────────────────────
 await SeedDatabaseAsync(app);
+await SeedCatalogDataAsync(app);  // ← NUEVO
 
 app.Run();
 
 // ─────────────────────────────────────────────────────────────
-// SEED: nunca insertar PasswordHash manualmente desde SQL.
-// Identity usa PBKDF2 internamente; siempre usar CreateAsync /
-// ResetPasswordAsync para generar hashes válidos.
+// SeedDatabaseAsync: roles y usuario admin
 // ─────────────────────────────────────────────────────────────
 static async Task SeedDatabaseAsync(WebApplication app)
 {
     using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var db          = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var logger      = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-    const string adminEmail = "admin@qualitydms.com";
+    const string adminEmail    = "admin@qualitydms.com";
     const string adminPassword = "Admin@123456";
     string[] requiredRoles = ["Admin", "QualityManager", "DocumentOwner",
-                                   "Reviewer", "Approver", "Reader", "Auditor"];
-    string[] adminRoles = ["Admin", "QualityManager", "Approver"];
+                               "Reviewer", "Approver", "Reader", "Auditor"];
+    string[] adminRoles    = ["Admin", "QualityManager", "Approver"];
 
     try
     {
         await db.Database.MigrateAsync();
 
-        // ── 1. Crear roles ────────────────────────────────────
         foreach (var role in requiredRoles)
-        {
             if (!await roleManager.RoleExistsAsync(role))
             {
                 await roleManager.CreateAsync(new IdentityRole(role));
                 logger.LogInformation("Rol creado: {Role}", role);
             }
-        }
 
-        // ── 2. Buscar usuario admin ───────────────────────────
         var admin = await userManager.FindByEmailAsync(adminEmail);
 
         if (admin is null)
         {
-            // ── 2a. No existe: crear desde cero con hash válido
             var dept = db.Departments.FirstOrDefault(d => d.Code == "CAL");
 
             admin = new ApplicationUser
             {
-                UserName = adminEmail,
-                Email = adminEmail,
-                FullName = "Administrador del Sistema",
-                Position = "Administrador",
-                DepartmentId = dept?.DepartmentId,
-                EmailConfirmed = true,
-                IsActive = true
+                UserName        = adminEmail,
+                Email           = adminEmail,
+                FullName        = "Administrador del Sistema",
+                Position        = "Administrador",
+                DepartmentId    = dept?.DepartmentId,
+                EmailConfirmed  = true,
+                IsActive        = true
             };
 
-            // CreateAsync genera el hash PBKDF2 correctamente
             var createResult = await userManager.CreateAsync(admin, adminPassword);
-
             if (createResult.Succeeded)
             {
                 await userManager.AddToRolesAsync(admin, adminRoles);
                 logger.LogInformation("Admin creado: {Email}", adminEmail);
             }
             else
-            {
                 logger.LogError("Error creando admin: {Errors}",
                     string.Join(", ", createResult.Errors.Select(e => e.Description)));
-            }
         }
         else
         {
-            // ── 2b. Ya existe: corregir hash inválido si viene del SQL seed ──
-            // El script SQL insertó 'AQAAAAIAAYagAAAAEHashed_Password_Here'
-            // que no es Base64 válido → System.FormatException en el login.
             bool hashInvalid = string.IsNullOrWhiteSpace(admin.PasswordHash)
                                || admin.PasswordHash.Contains("Hashed_Password_Here");
-
             if (hashInvalid)
             {
-                logger.LogWarning("Hash inválido detectado para {Email}. Regenerando...", adminEmail);
-
-                // ResetPasswordAsync genera un token seguro y actualiza el hash
-                var token = await userManager.GeneratePasswordResetTokenAsync(admin);
+                var token       = await userManager.GeneratePasswordResetTokenAsync(admin);
                 var resetResult = await userManager.ResetPasswordAsync(admin, token, adminPassword);
-
                 if (resetResult.Succeeded)
-                    logger.LogInformation("Hash corregido correctamente para {Email}.", adminEmail);
+                    logger.LogInformation("Hash corregido para {Email}.", adminEmail);
                 else
                     logger.LogError("Error al resetear contraseña: {Errors}",
                         string.Join(", ", resetResult.Errors.Select(e => e.Description)));
             }
 
-            // ── 2c. Asegurarse de que tiene los roles requeridos ──
             var currentRoles = await userManager.GetRolesAsync(admin);
             var missingRoles = adminRoles.Except(currentRoles).ToArray();
-
             if (missingRoles.Length > 0)
             {
                 await userManager.AddToRolesAsync(admin, missingRoles);
@@ -234,5 +207,95 @@ static async Task SeedDatabaseAsync(WebApplication app)
     catch (Exception ex)
     {
         logger.LogError(ex, "Error durante el seed de la base de datos");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// SeedCatalogDataAsync: departamentos, categorías y workflow
+// ─────────────────────────────────────────────────────────────
+static async Task SeedCatalogDataAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var db     = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        // ── Departamentos ─────────────────────────────────
+        if (!await db.Departments.AnyAsync())
+        {
+            db.Departments.AddRange(
+                new Department { Code = "CAL", Name = "Calidad",          IsActive = true },
+                new Department { Code = "OPE", Name = "Operaciones",      IsActive = true },
+                new Department { Code = "RRH", Name = "Recursos Humanos", IsActive = true },
+                new Department { Code = "TEC", Name = "Tecnología",       IsActive = true },
+                new Department { Code = "FIN", Name = "Finanzas",         IsActive = true }
+            );
+            await db.SaveChangesAsync();
+            logger.LogInformation("Departamentos creados.");
+        }
+
+        // ── Categorías de documentos ──────────────────────
+        if (!await db.DocumentCategories.AnyAsync())
+        {
+            db.DocumentCategories.AddRange(
+                new DocumentCategory { Code = "MAN", Name = "Manuales",       RetentionYears = 10, IsActive = true },
+                new DocumentCategory { Code = "PRO", Name = "Procedimientos",  RetentionYears = 7,  IsActive = true },
+                new DocumentCategory { Code = "REG", Name = "Registros",       RetentionYears = 5,  IsActive = true },
+                new DocumentCategory { Code = "FOR", Name = "Formatos",        RetentionYears = 5,  IsActive = true },
+                new DocumentCategory { Code = "INS", Name = "Instructivos",    RetentionYears = 7,  IsActive = true },
+                new DocumentCategory { Code = "POL", Name = "Políticas",       RetentionYears = 10, IsActive = true }
+            );
+            await db.SaveChangesAsync();
+            logger.LogInformation("Categorías creadas.");
+        }
+
+        // ── Workflow Template por defecto ─────────────────
+        if (!await db.WorkflowTemplates.AnyAsync())
+        {
+            var admin = await db.Users.FirstOrDefaultAsync(u => u.Email == "admin@qualitydms.com");
+            if (admin is not null)
+            {
+                var template = new WorkflowTemplate
+                {
+                    Name        = "Flujo Estándar de Aprobación",
+                    Description = "Revisión y aprobación estándar de documentos",
+                    IsDefault   = true,
+                    IsActive    = true,
+                    CreatedBy   = admin.Id
+                };
+                db.WorkflowTemplates.Add(template);
+                await db.SaveChangesAsync();
+
+                db.WorkflowTemplateSteps.AddRange(
+                    new WorkflowTemplateStep
+                    {
+                        TemplateId   = template.TemplateId,
+                        StepOrder    = 1,
+                        StepName     = "Revisión",
+                        StepType     = WorkflowStepType.Revision,
+                        RoleRequired = "Reviewer",
+                        DaysAllowed  = 3,
+                        IsRequired   = true
+                    },
+                    new WorkflowTemplateStep
+                    {
+                        TemplateId   = template.TemplateId,
+                        StepOrder    = 2,
+                        StepName     = "Aprobación",
+                        StepType     = WorkflowStepType.Aprobacion,
+                        RoleRequired = "Approver",
+                        DaysAllowed  = 3,
+                        IsRequired   = true
+                    }
+                );
+                await db.SaveChangesAsync();
+                logger.LogInformation("Workflow template creado.");
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error durante el seed de catálogos");
     }
 }

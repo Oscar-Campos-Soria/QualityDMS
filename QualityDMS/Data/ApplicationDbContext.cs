@@ -1,8 +1,6 @@
-﻿
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using QualityDMS.Models;
-
 
 namespace QualityDMS.Data;
 
@@ -84,11 +82,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
              .HasForeignKey(d => d.DepartmentId)
              .OnDelete(DeleteBehavior.Restrict);
 
-            // FK circular con DocumentVersion
             e.HasOne(d => d.CurrentVersionNav)
              .WithMany()
              .HasForeignKey(d => d.CurrentVersionId)
-             .OnDelete(DeleteBehavior.SetNull);
+             .OnDelete(DeleteBehavior.NoAction); // ← fix
 
             e.HasIndex(d => new { d.CurrentStatus, d.IsConfidential });
             e.HasIndex(d => d.DepartmentId);
@@ -116,12 +113,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             e.HasOne(v => v.ReviewedBy)
              .WithMany()
              .HasForeignKey(v => v.ReviewedById)
-             .OnDelete(DeleteBehavior.SetNull);
+             .OnDelete(DeleteBehavior.NoAction); // ← fix
 
             e.HasOne(v => v.ApprovedBy)
              .WithMany()
              .HasForeignKey(v => v.ApprovedById)
-             .OnDelete(DeleteBehavior.SetNull);
+             .OnDelete(DeleteBehavior.NoAction); // ← fix
 
             e.HasIndex(v => new { v.DocumentId, v.Status });
         });
@@ -132,6 +129,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             e.HasKey(s => s.StepId);
             e.HasIndex(s => new { s.TemplateId, s.StepOrder }).IsUnique();
             e.Property(s => s.StepType).HasConversion<byte>();
+
+            e.HasOne(s => s.Template)
+             .WithMany(t => t.Steps)
+             .HasForeignKey(s => s.TemplateId)
+             .OnDelete(DeleteBehavior.NoAction); // ← fix
 
             e.HasOne(s => s.Assignee)
              .WithMany()
@@ -198,7 +200,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             e.HasOne(f => f.VerifiedBy)
              .WithMany()
              .HasForeignKey(f => f.VerifiedById)
-             .OnDelete(DeleteBehavior.SetNull);
+             .OnDelete(DeleteBehavior.NoAction); // ← fix
         });
 
         // ── AuditLog ─────────────────────────────────────────

@@ -1,5 +1,4 @@
-﻿
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -8,10 +7,7 @@ using QualityDMS.Data;
 using QualityDMS.Models;
 using QualityDMS.Models.ViewModels;
 using QualityDMS.Services;
-using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text.Json;
-
 
 namespace QualityDMS.Controllers;
 
@@ -44,13 +40,13 @@ public class DocumentsController : Controller
         INotificationService notifications,
         ILogger<DocumentsController> logger)
     {
-        _db = db;
-        _userManager = userManager;
-        _storage = storage;
-        _workflow = workflow;
-        _auditLog = auditLog;
+        _db            = db;
+        _userManager   = userManager;
+        _storage       = storage;
+        _workflow      = workflow;
+        _auditLog      = auditLog;
         _notifications = notifications;
-        _logger = logger;
+        _logger        = logger;
     }
 
     // ── GET /Documents ──────────────────────────────────────
@@ -64,7 +60,6 @@ public class DocumentsController : Controller
             .Include(d => d.CurrentVersionNav)
             .AsNoTracking();
 
-        // Filtrar documentos confidenciales para no admins
         if (!User.IsInRole("Admin") && !User.IsInRole("QualityManager"))
         {
             var userId = _userManager.GetUserId(User)!;
@@ -97,20 +92,20 @@ public class DocumentsController : Controller
             .Take(filter.PageSize)
             .Select(d => new DocumentSummaryDto
             {
-                DocumentId = d.DocumentId,
-                Code = d.Code,
-                Title = d.Title,
-                CurrentStatus = (byte)d.CurrentStatus,
-                StatusLabel = d.StatusLabel,
-                StatusBadge = d.StatusBadgeClass,
+                DocumentId     = d.DocumentId,
+                Code           = d.Code,
+                Title          = d.Title,
+                CurrentStatus  = (byte)d.CurrentStatus,
+                StatusLabel    = d.StatusLabel,
+                StatusBadge    = d.StatusBadgeClass,
                 CurrentVersion = d.CurrentVersion,
-                CategoryName = d.Category.Name,
+                CategoryName   = d.Category.Name,
                 DepartmentName = d.Department.Name,
-                OwnerName = d.Owner.FullName,
+                OwnerName      = d.Owner.FullName,
                 IsConfidential = d.IsConfidential,
                 NextReviewDate = d.NextReviewDate,
-                UpdatedAt = d.UpdatedAt,
-                FileExtension = d.CurrentVersionNav != null ? d.CurrentVersionNav.FileExtension : ""
+                UpdatedAt      = d.UpdatedAt,
+                FileExtension  = d.CurrentVersionNav != null ? d.CurrentVersionNav.FileExtension : ""
             })
             .ToListAsync();
 
@@ -118,11 +113,11 @@ public class DocumentsController : Controller
 
         var vm = new DocumentIndexViewModel
         {
-            Documents = documents,
-            Filter = filter,
-            TotalCount = totalCount,
-            PageNumber = filter.PageNumber,
-            PageSize = filter.PageSize
+            Documents   = documents,
+            Filter      = filter,
+            TotalCount  = totalCount,
+            PageNumber  = filter.PageNumber,
+            PageSize    = filter.PageSize
         };
 
         return View(vm);
@@ -145,7 +140,6 @@ public class DocumentsController : Controller
 
         if (document is null) return NotFound();
 
-        // Control de acceso a confidenciales
         if (document.IsConfidential && !User.IsInRole("Admin") && !User.IsInRole("QualityManager"))
         {
             var userId = _userManager.GetUserId(User)!;
@@ -181,32 +175,32 @@ public class DocumentsController : Controller
 
                 pendingAction = new PendingApprovalDto
                 {
-                    InstanceId = activeWorkflow.InstanceId,
-                    VersionId = activeWorkflow.VersionId,
-                    DocumentId = id,
-                    DocumentCode = document.Code,
-                    DocumentTitle = document.Title,
-                    StepName = step.StepName,
-                    StepType = (byte)step.StepType,
-                    CurrentStep = activeWorkflow.CurrentStep,
-                    StartedAt = activeWorkflow.StartedAt,
-                    DueDate = activeWorkflow.StartedAt.AddDays(step.DaysAllowed)
+                    InstanceId     = activeWorkflow.InstanceId,
+                    VersionId      = activeWorkflow.VersionId,
+                    DocumentId     = id,
+                    DocumentCode   = document.Code,
+                    DocumentTitle  = document.Title,
+                    StepName       = step.StepName,
+                    StepType       = (byte)step.StepType,
+                    CurrentStep    = activeWorkflow.CurrentStep,
+                    StartedAt      = activeWorkflow.StartedAt,
+                    DueDate        = activeWorkflow.StartedAt.AddDays(step.DaysAllowed)
                 };
             }
         }
 
         var vm = new DocumentDetailViewModel
         {
-            Document = document,
-            Versions = document.Versions.ToList(),
-            ActiveWorkflow = activeWorkflow,
+            Document        = document,
+            Versions        = document.Versions.ToList(),
+            ActiveWorkflow  = activeWorkflow,
             WorkflowHistory = activeWorkflow?.Actions.ToList() ?? [],
-            CanEdit = document.CurrentStatus == DocumentStatus.Borrador &&
+            CanEdit         = document.CurrentStatus == DocumentStatus.Borrador &&
                               (document.OwnerId == userId2 || User.IsInRole("Admin")),
             CanUploadVersion = document.CurrentStatus is DocumentStatus.Borrador or DocumentStatus.Aprobado,
-            CanApprove = canApprove,
-            CanObsolete = document.CurrentStatus == DocumentStatus.Aprobado && User.IsInRole("QualityManager"),
-            PendingAction = pendingAction
+            CanApprove      = canApprove,
+            CanObsolete     = document.CurrentStatus == DocumentStatus.Aprobado && User.IsInRole("QualityManager"),
+            PendingAction   = pendingAction
         };
 
         return View(vm);
@@ -234,7 +228,6 @@ public class DocumentsController : Controller
             return View(vm);
         }
 
-        // Validar archivo
         var fileError = ValidateFile(vm.File);
         if (fileError is not null)
         {
@@ -243,7 +236,6 @@ public class DocumentsController : Controller
             return View(vm);
         }
 
-        // Verificar código único
         if (await _db.Documents.AnyAsync(d => d.Code == vm.Code))
         {
             ModelState.AddModelError("Code", "Ya existe un documento con este código.");
@@ -251,79 +243,85 @@ public class DocumentsController : Controller
             return View(vm);
         }
 
-        var userId = _userManager.GetUserId(User)!;
+        var userId          = _userManager.GetUserId(User)!;
+        int createdDocumentId = 0;
 
-        await using var transaction = await _db.Database.BeginTransactionAsync();
         try
         {
-            // Guardar archivo
-            var (fileName, filePath, hash) = await _storage.SaveFileAsync(vm.File!, "documents");
+            // ── Fix: ExecutionStrategy compatible con retry + transacción ──
+            var strategy = _db.Database.CreateExecutionStrategy();
 
-            // Crear documento
-            var document = new Document
+            await strategy.ExecuteAsync(async () =>
             {
-                Code = vm.Code.ToUpper().Trim(),
-                Title = vm.Title.Trim(),
-                Description = vm.Description?.Trim(),
-                CategoryId = vm.CategoryId,
-                DepartmentId = vm.DepartmentId,
-                OwnerId = userId,
-                CurrentStatus = DocumentStatus.Borrador,
-                CurrentVersion = "0.1",
-                Tags = vm.Tags,
-                IsConfidential = vm.IsConfidential,
-                NextReviewDate = vm.NextReviewDate,
-                CreatedBy = userId,
-                UpdatedBy = userId
-            };
+                await using var transaction = await _db.Database.BeginTransactionAsync();
 
-            _db.Documents.Add(document);
-            await _db.SaveChangesAsync();
+                var (fileName, filePath, hash) = await _storage.SaveFileAsync(vm.File!, "documents");
 
-            // Crear primera versión
-            var version = new DocumentVersion
-            {
-                DocumentId = document.DocumentId,
-                VersionNumber = "0.1",
-                VersionType = VersionType.Menor,
-                ChangeLog = vm.ChangeLog ?? "Versión inicial",
-                FileName = fileName,
-                OriginalFileName = vm.File!.FileName,
-                FilePath = filePath,
-                FileExtension = Path.GetExtension(vm.File.FileName).ToLower(),
-                FileSizeBytes = vm.File.Length,
-                ContentType = vm.File.ContentType,
-                FileHash = hash,
-                Status = DocumentStatus.Borrador,
-                AuthorId = userId
-            };
+                var document = new Document
+                {
+                    Code           = vm.Code.ToUpper().Trim(),
+                    Title          = vm.Title.Trim(),
+                    Description    = vm.Description?.Trim(),
+                    CategoryId     = vm.CategoryId,
+                    DepartmentId   = vm.DepartmentId,
+                    OwnerId        = userId,
+                    CurrentStatus  = DocumentStatus.Borrador,
+                    CurrentVersion = "0.1",
+                    Tags           = vm.Tags,
+                    IsConfidential = vm.IsConfidential,
+                    NextReviewDate = vm.NextReviewDate,
+                    CreatedBy      = userId,
+                    UpdatedBy      = userId
+                };
 
-            _db.DocumentVersions.Add(version);
-            await _db.SaveChangesAsync();
+                _db.Documents.Add(document);
+                await _db.SaveChangesAsync();
 
-            // Actualizar referencia a versión actual
-            document.CurrentVersionId = version.VersionId;
-            await _db.SaveChangesAsync();
+                var version = new DocumentVersion
+                {
+                    DocumentId       = document.DocumentId,
+                    VersionNumber    = "0.1",
+                    VersionType      = VersionType.Menor,
+                    ChangeLog        = vm.ChangeLog ?? "Versión inicial",
+                    FileName         = fileName,
+                    OriginalFileName = vm.File!.FileName,
+                    FilePath         = filePath,
+                    FileExtension    = Path.GetExtension(vm.File.FileName).ToLower(),
+                    FileSizeBytes    = vm.File.Length,
+                    ContentType      = vm.File.ContentType,
+                    FileHash         = hash,
+                    Status           = DocumentStatus.Borrador,
+                    AuthorId         = userId
+                };
 
-            // Iniciar workflow
-            await _workflow.StartWorkflowAsync(version.VersionId, vm.WorkflowTemplateId, userId);
+                _db.DocumentVersions.Add(version);
+                await _db.SaveChangesAsync();
 
-            // Actualizar estado
-            document.CurrentStatus = DocumentStatus.EnRevision;
-            await _db.SaveChangesAsync();
+                document.CurrentVersionId = version.VersionId;
+                await _db.SaveChangesAsync();
 
-            await transaction.CommitAsync();
+                await _workflow.StartWorkflowAsync(version.VersionId, vm.WorkflowTemplateId, userId);
 
-            await _auditLog.LogAsync("Document", document.DocumentId.ToString(),
-                "Create", null, JsonSerializer.Serialize(new { document.Code, document.Title }), userId);
+                document.CurrentStatus = DocumentStatus.EnRevision;
+                await _db.SaveChangesAsync();
 
-            _logger.LogInformation("Documento {Code} creado por {UserId}", document.Code, userId);
-            TempData["Success"] = $"Documento {document.Code} creado y enviado al flujo de aprobación.";
-            return RedirectToAction(nameof(Details), new { id = document.DocumentId });
+                await transaction.CommitAsync();
+
+                createdDocumentId = document.DocumentId;
+
+                await _auditLog.LogAsync("Document", document.DocumentId.ToString(),
+                    "Create", null,
+                    JsonSerializer.Serialize(new { document.Code, document.Title }),
+                    userId);
+
+                _logger.LogInformation("Documento {Code} creado por {UserId}", document.Code, userId);
+                TempData["Success"] = $"Documento {document.Code} creado y enviado al flujo de aprobación.";
+            });
+
+            return RedirectToAction(nameof(Details), new { id = createdDocumentId });
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             _logger.LogError(ex, "Error creando documento");
             ModelState.AddModelError("", "Ocurrió un error al crear el documento. Intente de nuevo.");
             await PopulateCreateListsAsync(vm);
@@ -351,16 +349,16 @@ public class DocumentsController : Controller
 
         var vm = new DocumentEditViewModel
         {
-            DocumentId = document.DocumentId,
-            Title = document.Title,
-            Description = document.Description,
-            CategoryId = document.CategoryId,
-            DepartmentId = document.DepartmentId,
-            Tags = document.Tags,
+            DocumentId     = document.DocumentId,
+            Title          = document.Title,
+            Description    = document.Description,
+            CategoryId     = document.CategoryId,
+            DepartmentId   = document.DepartmentId,
+            Tags           = document.Tags,
             IsConfidential = document.IsConfidential,
             NextReviewDate = document.NextReviewDate,
-            Categories = new SelectList(await _db.DocumentCategories.Where(c => c.IsActive).ToListAsync(), "CategoryId", "Name", document.CategoryId),
-            Departments = new SelectList(await _db.Departments.Where(d => d.IsActive).ToListAsync(), "DepartmentId", "Name", document.DepartmentId)
+            Categories     = new SelectList(await _db.DocumentCategories.Where(c => c.IsActive).ToListAsync(), "CategoryId", "Name", document.CategoryId),
+            Departments    = new SelectList(await _db.Departments.Where(d => d.IsActive).ToListAsync(), "DepartmentId", "Name", document.DepartmentId)
         };
 
         return View(vm);
@@ -376,7 +374,7 @@ public class DocumentsController : Controller
 
         if (!ModelState.IsValid)
         {
-            vm.Categories = new SelectList(await _db.DocumentCategories.Where(c => c.IsActive).ToListAsync(), "CategoryId", "Name", vm.CategoryId);
+            vm.Categories  = new SelectList(await _db.DocumentCategories.Where(c => c.IsActive).ToListAsync(), "CategoryId", "Name", vm.CategoryId);
             vm.Departments = new SelectList(await _db.Departments.Where(d => d.IsActive).ToListAsync(), "DepartmentId", "Name", vm.DepartmentId);
             return View(vm);
         }
@@ -384,18 +382,18 @@ public class DocumentsController : Controller
         var document = await _db.Documents.FindAsync(id);
         if (document is null) return NotFound();
 
-        var userId = _userManager.GetUserId(User)!;
+        var userId    = _userManager.GetUserId(User)!;
         var oldValues = JsonSerializer.Serialize(new { document.Title, document.Description });
 
-        document.Title = vm.Title.Trim();
-        document.Description = vm.Description?.Trim();
-        document.CategoryId = vm.CategoryId;
-        document.DepartmentId = vm.DepartmentId;
-        document.Tags = vm.Tags;
+        document.Title          = vm.Title.Trim();
+        document.Description    = vm.Description?.Trim();
+        document.CategoryId     = vm.CategoryId;
+        document.DepartmentId   = vm.DepartmentId;
+        document.Tags           = vm.Tags;
         document.IsConfidential = vm.IsConfidential;
         document.NextReviewDate = vm.NextReviewDate;
-        document.UpdatedAt = DateTime.UtcNow;
-        document.UpdatedBy = userId;
+        document.UpdatedAt      = DateTime.UtcNow;
+        document.UpdatedBy      = userId;
 
         await _db.SaveChangesAsync();
         await _auditLog.LogAsync("Document", id.ToString(), "Update",
@@ -421,11 +419,11 @@ public class DocumentsController : Controller
 
         var vm = new NewVersionViewModel
         {
-            DocumentId = id,
-            DocumentCode = document.Code,
-            DocumentTitle = document.Title,
-            CurrentVersion = document.CurrentVersion,
-            ProposedVersion = IncrementVersion(document.CurrentVersion, VersionType.Menor),
+            DocumentId        = id,
+            DocumentCode      = document.Code,
+            DocumentTitle     = document.Title,
+            CurrentVersion    = document.CurrentVersion,
+            ProposedVersion   = IncrementVersion(document.CurrentVersion, VersionType.Menor),
             WorkflowTemplates = new SelectList(
                 await _db.WorkflowTemplates.Where(w => w.IsActive).ToListAsync(),
                 "TemplateId", "Name")
@@ -459,52 +457,59 @@ public class DocumentsController : Controller
         var document = await _db.Documents.FindAsync(vm.DocumentId);
         if (document is null) return NotFound();
 
-        var userId = _userManager.GetUserId(User)!;
+        var userId           = _userManager.GetUserId(User)!;
         var newVersionNumber = IncrementVersion(document.CurrentVersion, vm.VersionType);
 
-        await using var transaction = await _db.Database.BeginTransactionAsync();
         try
         {
-            var (fileName, filePath, hash) = await _storage.SaveFileAsync(vm.File!, "documents");
+            // ── Fix: ExecutionStrategy compatible con retry + transacción ──
+            var strategy = _db.Database.CreateExecutionStrategy();
 
-            var version = new DocumentVersion
+            await strategy.ExecuteAsync(async () =>
             {
-                DocumentId = document.DocumentId,
-                VersionNumber = newVersionNumber,
-                VersionType = vm.VersionType,
-                ChangeLog = vm.ChangeLog,
-                FileName = fileName,
-                OriginalFileName = vm.File!.FileName,
-                FilePath = filePath,
-                FileExtension = Path.GetExtension(vm.File.FileName).ToLower(),
-                FileSizeBytes = vm.File.Length,
-                ContentType = vm.File.ContentType,
-                FileHash = hash,
-                Status = DocumentStatus.Borrador,
-                EffectiveDate = vm.EffectiveDate,
-                AuthorId = userId
-            };
+                await using var transaction = await _db.Database.BeginTransactionAsync();
 
-            _db.DocumentVersions.Add(version);
-            await _db.SaveChangesAsync();
+                var (fileName, filePath, hash) = await _storage.SaveFileAsync(vm.File!, "documents");
 
-            await _workflow.StartWorkflowAsync(version.VersionId, vm.WorkflowTemplateId, userId);
+                var version = new DocumentVersion
+                {
+                    DocumentId       = document.DocumentId,
+                    VersionNumber    = newVersionNumber,
+                    VersionType      = vm.VersionType,
+                    ChangeLog        = vm.ChangeLog,
+                    FileName         = fileName,
+                    OriginalFileName = vm.File!.FileName,
+                    FilePath         = filePath,
+                    FileExtension    = Path.GetExtension(vm.File.FileName).ToLower(),
+                    FileSizeBytes    = vm.File.Length,
+                    ContentType      = vm.File.ContentType,
+                    FileHash         = hash,
+                    Status           = DocumentStatus.Borrador,
+                    EffectiveDate    = vm.EffectiveDate,
+                    AuthorId         = userId
+                };
 
-            document.CurrentVersionId = version.VersionId;
-            document.CurrentVersion = newVersionNumber;
-            document.CurrentStatus = DocumentStatus.EnRevision;
-            document.UpdatedAt = DateTime.UtcNow;
-            document.UpdatedBy = userId;
+                _db.DocumentVersions.Add(version);
+                await _db.SaveChangesAsync();
 
-            await _db.SaveChangesAsync();
-            await transaction.CommitAsync();
+                await _workflow.StartWorkflowAsync(version.VersionId, vm.WorkflowTemplateId, userId);
 
-            TempData["Success"] = $"Nueva versión {newVersionNumber} enviada al flujo de aprobación.";
+                document.CurrentVersionId = version.VersionId;
+                document.CurrentVersion   = newVersionNumber;
+                document.CurrentStatus    = DocumentStatus.EnRevision;
+                document.UpdatedAt        = DateTime.UtcNow;
+                document.UpdatedBy        = userId;
+
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                TempData["Success"] = $"Nueva versión {newVersionNumber} enviada al flujo de aprobación.";
+            });
+
             return RedirectToAction(nameof(Details), new { id = document.DocumentId });
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             _logger.LogError(ex, "Error creando nueva versión");
             ModelState.AddModelError("", "Error al crear la nueva versión.");
             vm.WorkflowTemplates = new SelectList(await _db.WorkflowTemplates.Where(w => w.IsActive).ToListAsync(), "TemplateId", "Name");
@@ -555,15 +560,15 @@ public class DocumentsController : Controller
 
         var userId = _userManager.GetUserId(User)!;
         document.CurrentStatus = DocumentStatus.Obsoleto;
-        document.UpdatedAt = DateTime.UtcNow;
-        document.UpdatedBy = userId;
+        document.UpdatedAt     = DateTime.UtcNow;
+        document.UpdatedBy     = userId;
 
         if (document.CurrentVersionId.HasValue)
         {
             var v = await _db.DocumentVersions.FindAsync(document.CurrentVersionId.Value);
             if (v is not null)
             {
-                v.Status = DocumentStatus.Obsoleto;
+                v.Status      = DocumentStatus.Obsoleto;
                 v.ObsoletedAt = DateTime.UtcNow;
             }
         }
@@ -602,10 +607,10 @@ public class DocumentsController : Controller
 
         return type switch
         {
-            VersionType.Mayor => $"{major + 1}.0",
-            VersionType.Menor => $"{major}.{minor + 1}",
+            VersionType.Mayor  => $"{major + 1}.0",
+            VersionType.Menor  => $"{major}.{minor + 1}",
             VersionType.Parche => $"{major}.{minor}.{(parts.Length > 2 && int.TryParse(parts[2], out var p) ? p + 1 : 1)}",
-            _ => $"{major}.{minor + 1}"
+            _                  => $"{major}.{minor + 1}"
         };
     }
 
