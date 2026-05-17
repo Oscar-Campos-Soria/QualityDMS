@@ -1,0 +1,21 @@
+# .NET build artifacts
+src/dotnet-core/**/bin/
+src/dotnet-core/**/obj/
+
+# Python
+src/python-service/__pycache__/
+src/python-service/**/__pycache__/
+src/python-service/.venv/
+src/python-service/*.pyc
+
+# PHP
+src/php-app/storage/pdfs/
+src/php-app/sync/sync_errors.log
+src/php-app/sync/ultimo_sync.txt
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
