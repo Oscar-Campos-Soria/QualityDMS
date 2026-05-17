@@ -4,12 +4,26 @@
  * Este archivo coordina la descarga de categorías, departamentos y documentos.
  */
 
-// 1. Configuración de cabeceras para visualización en navegador
+// Deshabilitar compresión y buffering para streaming en navegador
+@apache_setenv('no-gzip', 1);
+@ini_set('zlib.output_compression', 0);
+@ini_set('implicit_flush', 1);
+while (ob_get_level()) ob_end_clean();
+ob_implicit_flush(true);
+set_time_limit(0);
+
 header('Content-Type: text/plain; charset=utf-8');
+header('X-Accel-Buffering: no'); // para nginx si aplica
+header('Cache-Control: no-cache');
+
+// Padding inicial — navegadores esperan ~1KB antes de renderizar streaming
+echo str_pad('', 1024) . "\n";
+
 echo "====================================================\n";
 echo "   SISTEMA DE SINCRONIZACIÓN PUBLIC DMS             \n";
 echo "   Iniciado: " . date('d-m-Y H:i:s') . "            \n";
 echo "====================================================\n\n";
+flush();
 
 // 2. Definición de rutas
 $archivo_log_tiempo = __DIR__ . '/ultimo_sync.txt';
@@ -17,18 +31,17 @@ $archivo_log_tiempo = __DIR__ . '/ultimo_sync.txt';
 try {
     // 3. Ejecución de Módulos (El orden es vital por llaves foráneas)
     
-    echo "[1/3] Sincronizando Categorías...\n";
+    echo "[1/3] Sincronizando Categorías...\n"; flush();
     require_once __DIR__ . '/sync_categories.php';
-    echo "✓ Categorías completadas.\n\n";
+    echo "✓ Categorías completadas.\n\n"; flush();
 
-    echo "[2/3] Sincronizando Departamentos...\n";
+    echo "[2/3] Sincronizando Departamentos...\n"; flush();
     require_once __DIR__ . '/sync_departments.php';
-    echo "✓ Departamentos completados.\n\n";
+    echo "✓ Departamentos completados.\n\n"; flush();
 
-    echo "[3/3] Sincronizando Documentos y Descarga de Archivos...\n";
-    // Este script contiene la lógica de file_get_contents que añadimos
+    echo "[3/3] Sincronizando Documentos...\n"; flush();
     require_once __DIR__ . '/sync_docs.php';
-    echo "✓ Documentos y archivos físicos actualizados.\n\n";
+    echo "✓ Documentos actualizados.\n\n"; flush();
 
     // 4. Actualizar marca de tiempo de éxito
     // Esto lo lee el index.php para mostrar "Último Sync: HH:mm"

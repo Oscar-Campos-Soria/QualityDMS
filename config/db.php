@@ -1,30 +1,19 @@
 <?php
-// Configuración de la base de datos
-$host = 'localhost';
-$db   = 'PublicDMS';
-$user = 'postgres';
-$pass = '1234';
-$port = '5432';
+$host = getenv('POSTGRES_HOST')     ?: 'localhost';
+$db   = getenv('POSTGRES_DB')       ?: 'PublicDMS';
+$user = getenv('POSTGRES_USER')     ?: 'postgres';
+$pass = getenv('POSTGRES_PASSWORD') ?: '1234';
+$port = getenv('POSTGRES_PORT')     ?: '5432';
 
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$db";
-    $options = [
+    $pdo = new PDO($dsn, $user, $pass, [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        // Es recomendable forzar UTF-8 para evitar problemas con tildes o eñes
-        PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8" 
-    ];
-    
-    $pdo = new PDO($dsn, $user, $pass, $options);
-
-    /**
-     * AJUSTE DE ESQUEMA:
-     * Establecemos el "search_path" para que PHP encuentre las tablas en 'publicdms' 
-     * sin necesidad de escribir el prefijo en cada consulta SQL.
-     */
+    ]);
     $pdo->exec("SET search_path TO publicdms, public");
-
 } catch (PDOException $e) {
-    echo "Error de conexión: " . $e->getMessage();
+    http_response_code(500);
+    echo json_encode(["error" => "DB connection failed"]);
     exit;
 }

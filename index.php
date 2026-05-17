@@ -151,20 +151,20 @@ if (!file_exists($archivo_sync_log) || (time() - (int)file_get_contents($archivo
         loadReports();
     });
 
-    // Botón Sincronizar
+    // Botón Sincronizar — llama sync directo (incremental = segundos)
     document.getElementById('btnSync').addEventListener('click', async function() {
-        const btn = this;
+        const btn  = this;
         const icon = document.getElementById('syncIcon');
         btn.disabled = true;
         icon.classList.add('bi-spin');
-        
+
         try {
             await fetch('sync/sync_main.php');
-            location.reload(); // Recargar para ver los nuevos archivos y datos
+            location.reload();
         } catch (error) {
-            alert('Error en la sincronización');
             btn.disabled = false;
             icon.classList.remove('bi-spin');
+            alert('Error en la sincronización');
         }
     });
 
@@ -192,9 +192,11 @@ if (!file_exists($archivo_sync_log) || (time() - (int)file_get_contents($archivo
         }
 
         tableBody.innerHTML = data.map(doc => {
-            // Lógica: Si el sync funcionó, el archivo está en storage/pdfs/ con el nombre local_file_name
-            const fileUrl = doc.local_file_name ? `storage/pdfs/${doc.local_file_name}` : '#';
-            
+            const hasFile   = doc.file_url && doc.file_url !== '';
+            const viewUrl   = hasFile ? 'view_pdf.php?file='     + encodeURIComponent(doc.file_url) : '#';
+            const dlUrl     = hasFile ? 'view_pdf.php?file='     + encodeURIComponent(doc.file_url) + '&download=1' : '#';
+            const disabled  = hasFile ? '' : 'disabled';
+
             return `
                 <tr>
                     <td class="ps-4 fw-bold text-secondary">${doc.code}</td>
@@ -205,9 +207,12 @@ if (!file_exists($archivo_sync_log) || (time() - (int)file_get_contents($archivo
                     <td><span class="badge bg-light text-dark border">${doc.category_name}</span></td>
                     <td>${doc.department_name}</td>
                     <td class="text-center"><span class="badge bg-info text-dark">v.${doc.version}</span></td>
-                    <td>
-                        <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-danger btn-view ${!doc.local_file_name ? 'disabled' : ''}">
+                    <td class="d-flex gap-1">
+                        <a href="${viewUrl}" target="_blank" class="btn btn-sm btn-outline-danger btn-view ${disabled}">
                             <i class="bi bi-file-pdf"></i> Abrir
+                        </a>
+                        <a href="${dlUrl}" class="btn btn-sm btn-outline-secondary ${disabled}" title="Descargar">
+                            <i class="bi bi-download"></i>
                         </a>
                     </td>
                 </tr>

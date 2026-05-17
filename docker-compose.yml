@@ -1,0 +1,182 @@
+version: "3.9"
+
+# ══════════════════════════════════════════════════════════
+#  Sistema Integral de Gestión Documental — Multi-Stack
+#  Servicios: SQL Server · PostgreSQL · MongoDB
+#             .NET 10 · PHP 8 · FastAPI (Python)
+# ══════════════════════════════════════════════════════════
+
+services:
+
+  # ──────────────────────────────────────────────────────
+  # SQL Server 2022 — Fuente maestra (CalidadSYS)
+  # ──────────────────────────────────────────────────────
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: dms_sqlserver
+    environment:
+      SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL",
+             "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P '${MSSQL_SA_PASSWORD}' -Q 'SELECT 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - dms_net
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────
+  # PostgreSQL 16 — Módulo PublicDMS
+  # ──────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: dms_postgres
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-PublicDMS}
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-PublicDMS}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dms_net
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────
+  # MongoDB 7 — Motor de búsqueda / indexación
+  # ──────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: dms_mongodb
+    environment:
+      MONGO_INITDB_DATABASE: dms_metadata
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./db/mongo:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dms_net
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────
+  # .NET Core 10 — Módulo Central (CalidadSYS)
+  # ──────────────────────────────────────────────────────
+  dotnet:
+    build:
+      context: ./src/dotnet-core
+      dockerfile: docker/dotnet-core/Dockerfile
+    container_name: dms_dotnet
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: >-
+        Server=sqlserver;Database=${MSSQL_DB:-QualityDMS};
+        User Id=sa;Password=${MSSQL_SA_PASSWORD};
+        TrustServerCertificate=True
+      Storage__LocalPath: /app/uploads
+    ports:
+      - "5000:8080"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - dms_net
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────
+  # FastAPI (Python 3.12) — Indexación y Metadatos
+  # ──────────────────────────────────────────────────────
+  fastapi:
+    build:
+      context: ./src/python-service
+      dockerfile: docker/python-service/Dockerfile
+    container_name: dms_fastapi
+    environment:
+      MONGO_URL:     mongodb://mongodb:27017/
+      DATABASE_NAME: dms_metadata
+      SQL_SERVER:    sqlserver
+      SQL_DATABASE:  ${MSSQL_DB:-QualityDMS}
+      SQL_USER:      sa
+      SQL_PASSWORD:  ${MSSQL_SA_PASSWORD}
+    ports:
+      - "8000:8000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - dms_net
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────
+  # PHP 8.3 + Apache — Módulo PublicDMS (Consulta Pública)
+  # Incluye cron para sync incremental automático cada 5 min
+  # ──────────────────────────────────────────────────────
+  php:
+    build:
+      context: .
+      dockerfile: docker/php-app/Dockerfile
+    container_name: dms_php
+    environment:
+      POSTGRES_HOST:     postgres
+      POSTGRES_DB:       ${POSTGRES_DB:-PublicDMS}
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SQLSERVER_HOST:    sqlserver
+      SQLSERVER_DB:      ${MSSQL_DB:-QualityDMS}
+      SQLSERVER_USER:    sa
+      SQLSERVER_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DMS_STORAGE_PATH:  /var/dms/uploads
+      FASTAPI_URL:       http://fastapi:8000
+    ports:
+      - "80:80"
+    volumes:
+      - uploads_data:/var/dms/uploads:ro   # mismo volumen que .NET, solo lectura
+    depends_on:
+      postgres:
+        condition: service_healthy
+      fastapi:
+        condition: service_started
+    networks:
+      - dms_net
+    restart: unless-stopped
+
+# ══════════════════════════════════════════════════════════
+#  Volúmenes — persistencia garantizada al reiniciar
+# ══════════════════════════════════════════════════════════
+volumes:
+  sqlserver_data:
+  postgres_data:
+  mongo_data:
+  uploads_data:     # compartido entre dotnet (rw) y php (ro)
+
+# ══════════════════════════════════════════════════════════
+#  Red interna — servicios se comunican por nombre
+# ══════════════════════════════════════════════════════════
+networks:
+  dms_net:
+    driver: bridge

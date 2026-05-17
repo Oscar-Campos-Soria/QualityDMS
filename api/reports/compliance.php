@@ -6,8 +6,9 @@ require_once __DIR__ . '/../../config/db.php';
 try {
     // Reporte 1: Conteo de documentos por departamento
     $statsQuery = "
-        SELECT department_name, COUNT(*) as total 
-        FROM documents 
+        SELECT department_name, COUNT(*) as total
+        FROM documents
+        WHERE is_active = TRUE
         GROUP BY department_name";
     
     $stats = $pdo->query($statsQuery)->fetchAll(PDO::FETCH_ASSOC);

@@ -10,7 +10,7 @@ $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $offset = ($page - 1) * $limit;
 
 try {
-    $whereClause  = "";
+    $whereClause  = "WHERE is_active = TRUE";
     $countParams  = [];
     $dataParams   = [];
     $mongoIds     = [];
@@ -23,7 +23,7 @@ try {
 
             if (!empty($mongoIds)) {
                 $placeholders = implode(',', array_fill(0, count($mongoIds), '?'));
-                $whereClause  = "WHERE id IN ($placeholders)";
+                $whereClause  = "WHERE id IN ($placeholders) AND is_active = TRUE";
                 $countParams  = $mongoIds;
                 $useMongoOrder = true;
             } else {
@@ -38,7 +38,7 @@ try {
         } catch (Exception $e) {
             // Fallback: ILIKE when FastAPI / Mongo unreachable
             error_log("[MongoSearch] Fallback ILIKE: " . $e->getMessage());
-            $whereClause = "WHERE title ILIKE ? OR code ILIKE ?";
+            $whereClause = "WHERE (title ILIKE ? OR code ILIKE ?) AND is_active = TRUE";
             $searchParam = '%' . $search . '%';
             $countParams = [$searchParam, $searchParam];
         }
