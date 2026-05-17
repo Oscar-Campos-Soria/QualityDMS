@@ -24,7 +24,7 @@ services:
       - sqlserver_data:/var/opt/mssql
     healthcheck:
       test: ["CMD-SHELL",
-             "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P '${MSSQL_SA_PASSWORD}' -Q 'SELECT 1' || exit 1"]
+             "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${MSSQL_SA_PASSWORD}' -Q 'SELECT 1' -No || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -85,7 +85,6 @@ services:
   dotnet:
     build:
       context: ./src/dotnet-core
-      dockerfile: docker/dotnet-core/Dockerfile
     container_name: dms_dotnet
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -112,7 +111,6 @@ services:
   fastapi:
     build:
       context: ./src/python-service
-      dockerfile: docker/python-service/Dockerfile
     container_name: dms_fastapi
     environment:
       MONGO_URL:     mongodb://mongodb:27017/
@@ -138,8 +136,7 @@ services:
   # ──────────────────────────────────────────────────────
   php:
     build:
-      context: .
-      dockerfile: docker/php-app/Dockerfile
+      context: ./src/php-app
     container_name: dms_php
     environment:
       POSTGRES_HOST:     postgres
