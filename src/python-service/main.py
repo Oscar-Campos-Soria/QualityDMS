@@ -1,9 +1,12 @@
-from fastapi import FastAPI, BackgroundTasks, Query, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 from database import collection
 from bulk_sync import run_bulk_sync_from_sql
 from routes.indexer import router as indexer_router
 from pymongo import TEXT
 import logging
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -11,9 +14,24 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="DMS Search Engine",
     description="Motor de búsqueda para documentos aprobados",
-    version="1.2.0",
+    version="1.3.0",
 )
 
+# ── API Key middleware ────────────────────────────────────────────────────────
+_API_KEY = os.getenv("FASTAPI_API_KEY", "")
+_OPEN_PATHS = {"/", "/docs", "/openapi.json", "/redoc", "/health"}
+
+
+class APIKeyMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if not _API_KEY or request.url.path in _OPEN_PATHS:
+            return await call_next(request)
+        if request.headers.get("X-API-Key", "") != _API_KEY:
+            return JSONResponse({"detail": "Invalid or missing API key"}, status_code=401)
+        return await call_next(request)
+
+
+app.add_middleware(APIKeyMiddleware)
 app.include_router(indexer_router)
 
 
@@ -46,6 +64,7 @@ async def create_search_indexes():
 
 
 @app.get("/", tags=["General"])
+@app.get("/health", tags=["General"])
 async def health_check():
     return {"status": "online", "engine": "FastAPI + MongoDB Text Search"}
 

@@ -26,9 +26,11 @@ class IndexerClient {
         curl_setopt($ch, CURLOPT_POST,           true);
         curl_setopt($ch, CURLOPT_POSTFIELDS,     $payload);
         curl_setopt($ch, CURLOPT_TIMEOUT,        5);
+        $apiKey = defined('FASTAPI_API_KEY') ? FASTAPI_API_KEY : (getenv('FASTAPI_API_KEY') ?: '');
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/json',
             'Content-Length: ' . strlen($payload),
+            'X-API-Key: ' . $apiKey,
         ]);
 
         curl_exec($ch);

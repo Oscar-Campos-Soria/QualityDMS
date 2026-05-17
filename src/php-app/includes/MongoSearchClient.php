@@ -1,18 +1,23 @@
 <?php
 class MongoSearchClient {
-    private $searchUrl = "http://127.0.0.1:8000/indexer/search";
+    private $searchUrl;
+    private $apiKey;
 
-    /**
-     * Queries FastAPI → MongoDB $text search.
-     * Returns doc IDs ordered by relevance score (best match first).
-     * Throws RuntimeException if FastAPI is unreachable or returns error.
-     */
+    public function __construct() {
+        $base = defined('FASTAPI_URL') ? FASTAPI_URL : (getenv('FASTAPI_URL') ?: 'http://127.0.0.1:8000');
+        $this->searchUrl = rtrim($base, '/') . '/indexer/search';
+        $this->apiKey    = defined('FASTAPI_API_KEY') ? FASTAPI_API_KEY : (getenv('FASTAPI_API_KEY') ?: '');
+    }
+
     public function searchDocumentIds(string $query): array {
         $url = $this->searchUrl . '?q=' . urlencode($query) . '&limit=500';
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'X-API-Key: ' . $this->apiKey,
+        ]);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);

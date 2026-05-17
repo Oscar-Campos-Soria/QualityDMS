@@ -3,11 +3,16 @@
 -- GENERADO DIRECTAMENTE POR: dotnet ef dbcontext script
 -- Fuente de verdad: EF Core 10.0.4 + Identity 10.0.4
 -- NO editar manualmente - regenerar con: dotnet ef dbcontext script
+--
+-- ADVERTENCIA: Este script es para instalación limpia (desarrollo/CI).
+-- En PRODUCCIÓN comentar el bloque DROP DATABASE de abajo.
+-- En producción usar: dotnet ef database update
 -- ============================================================
 
 USE master;
 GO
 
+-- ⚠️  SOLO PARA ENTORNO DE DESARROLLO — comentar en producción
 IF EXISTS (SELECT name FROM sys.databases WHERE name = N'QualityDMS')
 BEGIN
     ALTER DATABASE [QualityDMS] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;

@@ -11,3 +11,5 @@ define('FASTAPI_URL', rtrim(
     getenv('FASTAPI_URL') ?: 'http://127.0.0.1:8000',
     '/'
 ));
+
+define('FASTAPI_API_KEY', getenv('FASTAPI_API_KEY') ?: '');
