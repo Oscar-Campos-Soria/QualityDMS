@@ -15,7 +15,7 @@ services:
     container_name: dms_nginx
     ports:
       - "80:80"
-      - "443:443"
+      - "8443:443"   # 443 ocupado por XAMPP SSL → expuesto en 8443
     depends_on:
       - php
       - fastapi
@@ -44,7 +44,7 @@ services:
       ACCEPT_EULA:  "Y"
       MSSQL_PID:    Developer
     ports:
-      - "127.0.0.1:1433:1433"   # solo localhost — no exponer en prod
+      - "127.0.0.1:1434:1433"   # 1433 ocupado localmente → expuesto en 1434
     volumes:
       - sqlserver_data:/var/opt/mssql
     healthcheck:
@@ -79,7 +79,7 @@ services:
       POSTGRES_USER:     ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "127.0.0.1:5432:5432"   # solo localhost
+      - "127.0.0.1:5433:5432"   # 5432 ocupado localmente → expuesto en 5433
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/postgres:/docker-entrypoint-initdb.d:ro
@@ -113,7 +113,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
       MONGO_INITDB_DATABASE:      dms_metadata
     ports:
-      - "127.0.0.1:27017:27017"  # solo localhost
+      - "127.0.0.1:27018:27017"  # 27017 ocupado localmente → expuesto en 27018
     volumes:
       - mongo_data:/data/db
       - ./db/mongo:/docker-entrypoint-initdb.d:ro
@@ -144,15 +144,12 @@ services:
       context: ./src/dotnet-core
     container_name: dms_dotnet
     environment:
-      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: >-
-        Server=sqlserver;Database=${MSSQL_DB:-QualityDMS};
-        User Id=sa;Password=${MSSQL_SA_PASSWORD};
-        TrustServerCertificate=True
+      ConnectionStrings__QualityDMS: "Server=sqlserver,1433;Database=${MSSQL_DB:-QualityDMS};User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=True"
       Storage__LocalPath: /app/uploads
-    expose:
-      - "8080"    # interno — nginx lo expondrá si se necesita
+    ports:
+      - "127.0.0.1:5000:8080"
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -180,13 +177,14 @@ services:
       context: ./src/python-service
     container_name: dms_fastapi
     environment:
-      MONGO_URL:       mongodb://${MONGO_USER:-mongoadmin}:${MONGO_PASSWORD}@mongodb:27017/?authSource=admin
-      DATABASE_NAME:   dms_metadata
-      SQL_SERVER:      sqlserver
-      SQL_DATABASE:    ${MSSQL_DB:-QualityDMS}
-      SQL_USER:        sa
-      SQL_PASSWORD:    ${MSSQL_SA_PASSWORD}
-      FASTAPI_API_KEY: ${FASTAPI_API_KEY}
+      MONGO_URL:              mongodb://${MONGO_USER:-mongoadmin}:${MONGO_PASSWORD}@mongodb:27017/?authSource=admin
+      DATABASE_NAME:          dms_metadata
+      SQL_SERVER:             sqlserver
+      SQL_DATABASE:           ${MSSQL_DB:-QualityDMS}
+      SQL_USER:               sa
+      SQL_PASSWORD:           ${MSSQL_SA_PASSWORD}
+      FASTAPI_API_KEY:        ${FASTAPI_API_KEY}
+      SYNC_INTERVAL_SECONDS:  ${SYNC_INTERVAL_SECONDS:-30}
     expose:
       - "8000"    # interno — accesible via nginx en /api/
     depends_on:

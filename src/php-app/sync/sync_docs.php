@@ -4,15 +4,10 @@
 ini_set('memory_limit', '256M');
 set_time_limit(0);
 
-require_once __DIR__ . '/../config/storage.php';
-require_once __DIR__ . '/../includes/IndexerClient.php';
-use App\Services\IndexerClient;
-
 require_once __DIR__ . '/../config/sqlserver.php';
 require_once __DIR__ . '/../config/db.php';
 
 try {
-    $indexer = new IndexerClient();
 
     // --- MODO INCREMENTAL ---
     // Lee último sync exitoso. Resta 5 min de buffer para no perder registros
@@ -36,7 +31,6 @@ try {
     $batchSize      = 500;
     $offset         = 0;
     $totalProcessed = 0;
-    $totalIndexed   = 0;
 
     $queryPG = "
         INSERT INTO publicdms.documents (
@@ -113,21 +107,6 @@ try {
                 ':exp'       => $doc['ExpirationDate'],
             ]);
 
-            $dataSync = [
-                'id'              => $doc['doc_id'],
-                'code'            => $doc['doc_code'],
-                'title'           => $doc['doc_title'],
-                'category_name'   => $doc['cat_name'],
-                'department_name' => $doc['dep_name'],
-                'version'         => (string)$doc['doc_version'],
-                'is_active'       => $isActive,
-                'file_url'        => $rutaRelativa,
-            ];
-
-            if ($indexer->enviarAMongo($dataSync)) {
-                $totalIndexed++;
-            }
-
             $totalProcessed++;
         }
 
@@ -146,7 +125,6 @@ try {
     echo "\n====================================================\n";
     echo "   MODO         : $modeLabel\n";
     echo "   Procesados   : $totalProcessed\n";
-    echo "   Mongo indexed: $totalIndexed\n";
     echo "====================================================\n";
 
 } catch (Exception $e) {

@@ -4,17 +4,19 @@
  * Este archivo coordina la descarga de categorías, departamentos y documentos.
  */
 
-// Deshabilitar compresión y buffering para streaming en navegador
-@apache_setenv('no-gzip', 1);
-@ini_set('zlib.output_compression', 0);
-@ini_set('implicit_flush', 1);
-while (ob_get_level()) ob_end_clean();
-ob_implicit_flush(true);
 set_time_limit(0);
+$isCli = php_sapi_name() === 'cli';
 
-header('Content-Type: text/plain; charset=utf-8');
-header('X-Accel-Buffering: no'); // para nginx si aplica
-header('Cache-Control: no-cache');
+if (!$isCli) {
+    if (function_exists('apache_setenv')) apache_setenv('no-gzip', 1);
+    @ini_set('zlib.output_compression', 0);
+    @ini_set('implicit_flush', 1);
+    while (ob_get_level()) ob_end_clean();
+    ob_implicit_flush(true);
+    header('Content-Type: text/plain; charset=utf-8');
+    header('X-Accel-Buffering: no');
+    header('Cache-Control: no-cache');
+}
 
 // Padding inicial — navegadores esperan ~1KB antes de renderizar streaming
 echo str_pad('', 1024) . "\n";
