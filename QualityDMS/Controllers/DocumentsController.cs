@@ -543,6 +543,39 @@ public class DocumentsController : Controller
         return File(fileBytes, version.ContentType, version.OriginalFileName);
     }
 
+    // ── GET /Documents/PreviewVersion/5 ─────────────────────
+    
+    [HttpGet]
+    public async Task<IActionResult> PreviewVersion(int versionId)
+    {
+        var version = await _db.DocumentVersions.FindAsync(versionId);
+        
+        if (version == null) 
+            return NotFound("Versión no encontrada.");
+
+        var fileBytes = await _storage.GetFileAsync(version.FilePath);
+        
+        if (fileBytes == null || fileBytes.Length == 0)
+            return NotFound("El archivo físico no se encuentra en el servidor.");
+
+        // Forzar el Content-Type correcto para el navegador
+        var ext = Path.GetExtension(version.OriginalFileName ?? version.FilePath)?.ToLower();
+        string contentType = version.ContentType ?? "application/octet-stream";
+        
+        if (ext == ".pdf") 
+            contentType = "application/pdf";
+        else if (ext == ".jpg" || ext == ".jpeg") 
+            contentType = "image/jpeg";
+        else if (ext == ".png") 
+            contentType = "image/png";
+        else if (ext == ".gif") 
+            contentType = "image/gif";
+
+        // Devolver File() sin el parámetro 'fileDownloadName' instruye al navegador 
+        // a visualizar el archivo en línea (inline) en lugar de descargarlo.
+        return File(fileBytes, contentType);
+    }
+
     // ── POST /Documents/Obsolete/5 ──────────────────────────
 
     [HttpPost, ValidateAntiForgeryToken]

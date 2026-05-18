@@ -21,8 +21,8 @@
         @if (Model.CanApprove && Model.PendingAction != null)
         {
             <a asp-action="Approve" asp-controller="Workflow"
-                   asp-route-instanceId="@Model.PendingAction.InstanceId"
-                   class="btn btn-success">
+               asp-route-instanceId="@Model.PendingAction.InstanceId"
+               class="btn btn-success">
                 <i class="bi bi-check-circle"></i> Revisar aprobación
             </a>
         }
@@ -44,7 +44,6 @@
 <hr />
 
 <div class="row">
-    <!-- ── Columna izquierda ───────────────────────────── -->
     <div class="col-md-8">
 
         <h4>Información general</h4>
@@ -87,7 +86,6 @@
             </tr>
         </table>
 
-        <!-- ── Historial de versiones ──────────────────── -->
         <h4 class="mt-4">Historial de versiones</h4>
         <div class="table-responsive">
             <table class="table table-sm table-hover">
@@ -112,8 +110,8 @@
                             <td><span class="badge bg-secondary">@v.Status</span></td>
                             <td>
                                 <a asp-action="Download"
-                                       asp-route-id="@v.VersionId"
-                                       class="btn btn-sm btn-outline-primary">
+                                   asp-route-id="@v.VersionId"
+                                   class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-download"></i> Descargar
                                 </a>
                             </td>
@@ -123,7 +121,6 @@
             </table>
         </div>
 
-        <!-- ── Flujo de aprobación ─────────────────────── -->
         <h4 class="mt-4">Flujo de aprobación actual</h4>
         @if (Model.ActiveWorkflow != null)
         {
@@ -163,7 +160,6 @@
                             @if (!string.IsNullOrEmpty(action.Comments))
                             {
                                 <br />
-                            
                                 <small><em>Comentario: @action.Comments</em></small>
                             }
                         </li>
@@ -181,33 +177,71 @@
         }
     </div>
 
-    <!-- ── Columna derecha ────────────────────────────── -->
     <div class="col-md-4">
-        <div class="card shadow-sm">
+        <div class="card shadow-sm border-primary">
             <div class="card-header bg-primary text-white">
                 <i class="bi bi-file-earmark"></i> Archivo actual
             </div>
-            <div class="card-body text-center">
+            
+            <div class="card-body p-0 text-center bg-light">
                 @{
                     var currentVersion = Model.Versions
                         .FirstOrDefault(v => v.VersionNumber == Model.Document.CurrentVersion);
+
+                    bool isPdf = false;
+                    bool isImage = false;
+
+                    if (currentVersion != null && !string.IsNullOrEmpty(currentVersion.OriginalFileName))
+                    {
+                        var ext = System.IO.Path.GetExtension(currentVersion.OriginalFileName).ToLower();
+                        isPdf = ext == ".pdf";
+                        isImage = new[] { ".png", ".jpg", ".jpeg", ".gif" }.Contains(ext);
+                    }
                 }
+
                 @if (currentVersion != null)
                 {
-                    <i class="@currentVersion.FileIconClass" style="font-size:4rem;"></i>
-                    <p class="mt-2 mb-1 fw-semibold">@currentVersion.OriginalFileName</p>
-                    <p class="text-muted small">@currentVersion.FileSizeFormatted</p>
-                    <a asp-action="Download"
-                           asp-route-id="@currentVersion.VersionId"
-                           class="btn btn-primary w-100">
-                        <i class="bi bi-download"></i> Descargar
-                    </a>
+                    if (isPdf)
+                    {
+                        <iframe src="@Url.Action("PreviewVersion", "Documents", new { versionId = currentVersion.VersionId })"
+                                style="width: 100%; height: 400px; border: none; display: block;"
+                                title="Visor PDF">
+                        </iframe>
+                    }
+                    else if (isImage)
+                    {
+                        <div class="p-2">
+                            <img src="@Url.Action("PreviewVersion", "Documents", new { versionId = currentVersion.VersionId })"
+                                 class="img-fluid rounded" alt="Vista previa" style="max-height: 400px;" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="py-5">
+                            <i class="@currentVersion.FileIconClass" style="font-size:4rem;"></i>
+                            <p class="mt-2 mb-1 fw-semibold px-2">@currentVersion.OriginalFileName</p>
+                            <p class="text-muted small">@currentVersion.FileSizeFormatted</p>
+                        </div>
+                    }
                 }
                 else
                 {
-                    <p class="text-muted">No hay archivo disponible</p>
+                    <div class="py-5">
+                        <p class="text-muted mb-0">No hay archivo disponible</p>
+                    </div>
                 }
             </div>
+            
+            @if (currentVersion != null)
+            {
+                <div class="card-footer bg-white text-center py-3">
+                    <a asp-action="Download"
+                       asp-route-id="@currentVersion.VersionId"
+                       class="btn btn-primary w-100">
+                        <i class="bi bi-download"></i> Descargar archivo
+                    </a>
+                </div>
+            }
         </div>
 
         @if (Model.PendingAction != null)
@@ -227,8 +261,8 @@
                     @if (Model.CanApprove)
                     {
                         <a asp-action="Approve" asp-controller="Workflow"
-                               asp-route-instanceId="@Model.PendingAction.InstanceId"
-                               class="btn btn-success w-100 mt-2">
+                           asp-route-instanceId="@Model.PendingAction.InstanceId"
+                           class="btn btn-success w-100 mt-2">
                             <i class="bi bi-check2-circle"></i> Tomar acción
                         </a>
                     }
@@ -238,7 +272,6 @@
     </div>
 </div>
 
-<!-- ── Modal obsoleto ─────────────────────────────────────── -->
 <div class="modal fade" id="obsoleteModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">

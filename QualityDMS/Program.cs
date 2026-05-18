@@ -54,6 +54,7 @@ builder.Services.AddScoped<IWorkflowService, WorkflowService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+builder.Services.AddScoped<IPostgreSyncService, PostgreSyncService>();
 builder.Services.AddHttpContextAccessor();
 
 // ── Caché y Sesión ────────────────────────────────────────────
@@ -298,4 +299,5 @@ static async Task SeedCatalogDataAsync(WebApplication app)
     {
         logger.LogError(ex, "Error durante el seed de catálogos");
     }
+    
 }

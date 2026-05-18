@@ -1,76 +1,139 @@
 ﻿@model QualityDMS.Models.ViewModels.ApprovalActionViewModel
 @{
     ViewData["Title"] = $"Aprobar - {Model.DocumentCode} v{Model.VersionNumber}";
+    var extension = System.IO.Path.GetExtension(Model.FilePath ?? "").ToLower();
+    var isPdf     = extension == ".pdf";
+    var isImage   = new[] { ".png", ".jpg", ".jpeg", ".gif" }.Contains(extension);
+    var iconClass = extension switch
+    {
+        ".pdf"                             => "bi bi-file-earmark-pdf text-danger",
+        ".docx" or ".doc"                  => "bi bi-file-earmark-word text-primary",
+        ".xlsx" or ".xls"                  => "bi bi-file-earmark-excel text-success",
+        ".pptx" or ".ppt"                  => "bi bi-file-earmark-ppt text-warning",
+        ".dwg"  or ".dxf"                  => "bi bi-file-earmark-code text-info",
+        ".png" or ".jpg" or ".jpeg"        => "bi bi-file-earmark-image text-secondary",
+        _                                  => "bi bi-file-earmark"
+    };
 }
 
-<h1>Revisión de documento</h1>
-<p><strong>Documento:</strong> @Model.DocumentCode - @Model.DocumentTitle</p>
-<p><strong>Versión:</strong> @Model.VersionNumber | <strong>Paso actual:</strong> @Model.StepName</p>
+<div class="d-flex align-items-center gap-3 mb-3">
+    <a asp-action="Pending" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Volver
+    </a>
+    <div>
+        <h1 class="mb-0" style="font-size:20px;font-weight:500">Revisión de documento</h1>
+        <p class="text-muted mb-0" style="font-size:13px;">
+            <strong>@Model.DocumentCode</strong> — @Model.DocumentTitle &nbsp;·&nbsp;
+            v@(Model.VersionNumber) &nbsp;·&nbsp; Paso: <strong>@Model.StepName</strong>
+        </p>
+    </div>
+</div>
 <hr />
 
-<div class="row">
+<div class="row g-4">
+
     <div class="col-md-7">
-        <div class="card mb-3">
-            <div class="card-header bg-primary text-white">
-                <i class="bi bi-file-earmark-text"></i> Documento a revisar
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-file-earmark-text me-2"></i>Documento a revisar</span>
+                <a href="@Url.Action("DownloadVersion", "Workflow", new { versionId = Model.VersionId })"
+                   class="btn btn-sm btn-light">
+                    <i class="bi bi-download"></i> Descargar
+                </a>
             </div>
-            <div class="card-body text-center">
-                @{
-                    var extension = System.IO.Path.GetExtension(Model.FilePath).ToLower();
-                    var iconClass = extension switch
-                    {
-                        ".pdf" => "bi bi-file-earmark-pdf text-danger",
-                        ".docx" or ".doc" => "bi bi-file-earmark-word text-primary",
-                        ".xlsx" or ".xls" => "bi bi-file-earmark-excel text-success",
-                        ".pptx" or ".ppt" => "bi bi-file-earmark-ppt text-warning",
-                        ".dwg" or ".dxf" => "bi bi-file-earmark-code text-info",
-                        ".png" or ".jpg" or ".jpeg" => "bi bi-file-earmark-image text-secondary",
-                        _ => "bi bi-file-earmark"
-                    };
+            <div class="card-body p-0">
+
+                @if (isPdf)
+                {
+                    <iframe
+                        src="@Url.Action("PreviewVersion", "Workflow", new { versionId = Model.VersionId })"
+                        style="width:100%; height:75vh; border:none;"
+                        title="Vista previa del documento">
+                        <div class="text-center p-4">
+                            <p>Tu navegador no soporta visor PDF integrado.</p>
+                            <a href="@Url.Action("DownloadVersion", "Workflow", new { versionId = Model.VersionId })"
+                               class="btn btn-primary">
+                                <i class="bi bi-download"></i> Descargar para revisar
+                            </a>
+                        </div>
+                    </iframe>
                 }
-                <i class="@iconClass" style="font-size: 5rem;"></i>
-                <p class="mt-3">
-                    <a href="@Url.Action("DownloadVersion", "Documents", new { versionId = Model.VersionId })" class="btn btn-outline-primary">
-                        <i class="bi bi-download"></i> Descargar archivo
-                    </a>
-                </p>
+                else if (isImage)
+                {
+                    <div class="text-center p-3">
+                        <img src="@Url.Action("PreviewVersion", "Workflow", new { versionId = Model.VersionId })"
+                             class="img-fluid rounded" style="max-height:70vh;"
+                             alt="Vista previa" />
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-5">
+                        <i class="@iconClass" style="font-size:5rem;"></i>
+                        <p class="mt-3 text-muted" style="font-size:13px;">
+                            Este tipo de archivo no tiene vista previa disponible.
+                        </p>
+                        <a href="@Url.Action("DownloadVersion", "Workflow", new { versionId = Model.VersionId })"
+                           class="btn btn-outline-primary mt-2">
+                            <i class="bi bi-download"></i> Descargar para revisar
+                        </a>
+                    </div>
+                }
+
             </div>
         </div>
     </div>
 
     <div class="col-md-5">
-        <form asp-action="Approve" method="post">
-            @Html.AntiForgeryToken()
-            <input type="hidden" asp-for="InstanceId" />
-            <input type="hidden" asp-for="VersionId" />
-
-            <div class="mb-3">
-                <label asp-for="ActionType" class="form-label">Decisión</label>
-                <select asp-for="ActionType" class="form-select" asp-items="Html.GetEnumSelectList<WorkflowActionType>()"></select>
-                <span asp-validation-for="ActionType" class="text-danger"></span>
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light">
+                <strong><i class="bi bi-check2-circle me-2"></i>Tomar decisión</strong>
             </div>
+            <div class="card-body">
+                <form asp-action="Approve" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="InstanceId" />
+                    <input type="hidden" asp-for="VersionId" />
 
-            <div class="mb-3">
-                <label asp-for="Comments" class="form-label">Comentarios (opcional)</label>
-                <textarea asp-for="Comments" class="form-control" rows="4" placeholder="Observaciones, justificación, etc."></textarea>
-            </div>
+                    <div class="mb-3">
+                        <label asp-for="ActionType" class="form-label fw-semibold">Decisión</label>
+                        <select asp-for="ActionType" class="form-select"
+                                asp-items="Html.GetEnumSelectList<WorkflowActionType>()"></select>
+                        <span asp-validation-for="ActionType" class="text-danger small"></span>
+                    </div>
 
-            <div class="mb-3">
-                <label asp-for="SignatureData" class="form-label">Firma digital (Base64)</label>
-                <input asp-for="SignatureData" type="text" class="form-control" placeholder="Si usas firma, pégala aquí" />
-                <small class="form-text text-muted">Opcional. Puedes dejar vacío si no se requiere.</small>
-            </div>
+                    <div class="mb-3">
+                        <label asp-for="Comments" class="form-label fw-semibold">
+                            Comentarios <span class="text-muted fw-normal">(opcional)</span>
+                        </label>
+                        <textarea asp-for="Comments" class="form-control" rows="5"
+                                  placeholder="Observaciones, justificación, motivo de rechazo..."></textarea>
+                    </div>
 
-            <div class="d-flex justify-content-between">
-                <button type="submit" class="btn btn-success">Enviar decisión</button>
-                <a asp-action="MyPendingApprovals" class="btn btn-secondary">Cancelar</a>
+                    <div class="mb-4">
+                        <label asp-for="SignatureData" class="form-label fw-semibold">
+                            Firma digital <span class="text-muted fw-normal">(opcional)</span>
+                        </label>
+                        <input asp-for="SignatureData" type="text" class="form-control"
+                               placeholder="Base64 de la firma si aplica" />
+                        <small class="text-muted">Puedes dejarlo vacío si no se requiere.</small>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-send"></i> Enviar decisión
+                        </button>
+                        <a asp-action="Pending" class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
             </div>
-        </form>
+        </div>
     </div>
+
 </div>
 
 @section Scripts {
-    @{
-        await Html.RenderPartialAsync("_ValidationScriptsPartial");
-    }
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
 }
