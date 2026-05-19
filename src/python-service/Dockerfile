@@ -3,6 +3,7 @@ FROM python:3.12-slim-bookworm
 
 RUN apt-get update && apt-get install -y \
     curl gnupg2 apt-transport-https unixodbc-dev \
+    antiword catdoc \
     && rm -rf /var/lib/apt/lists/*
 
 # Microsoft ODBC Driver 17 (modern keyring, no apt-key)

@@ -161,13 +161,25 @@ curl http://localhost:5000/
 
 ## Formatos soportados para indexación de contenido
 
-| Formato | Librería       | Búsqueda de contenido |
-|---------|----------------|-----------------------|
-| PDF     | PyMuPDF        | ✓                     |
-| DOCX    | python-docx    | ✓                     |
-| TXT     | nativo Python  | ✓                     |
-| XLSX    | openpyxl       | ✓                     |
-| Otros   | —              | Solo metadatos        |
+| Formato | Extensión       | Librería            |
+|---------|-----------------|---------------------|
+| PDF     | .pdf            | PyMuPDF             |
+| Word    | .docx           | python-docx         |
+| Word    | .doc            | antiword (sistema)  |
+| Excel   | .xlsx           | openpyxl            |
+| Excel   | .xls            | xlrd                |
+| PowerPoint | .pptx        | python-pptx         |
+| PowerPoint | .ppt         | catppt (sistema)    |
+| Texto   | .txt / .md      | nativo + chardet    |
+| RTF     | .rtf            | striprtf            |
+| OpenDoc | .odt / .ods / .odp | odfpy            |
+| CSV     | .csv            | nativo              |
+| Web     | .html / .htm    | beautifulsoup4      |
+| XML     | .xml            | lxml                |
+| Email   | .eml            | nativo email lib    |
+| Outlook | .msg            | extract-msg         |
+
+Archivos con formato no soportado se indexan con solo metadatos (sin contenido).
 
 ## Desarrollo local (sin Docker)
 
