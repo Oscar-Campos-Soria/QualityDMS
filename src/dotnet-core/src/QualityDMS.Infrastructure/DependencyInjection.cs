@@ -50,6 +50,23 @@ public static class DependencyInjection
 
         services.AddHttpContextAccessor();
 
+        var fastapiUrl = configuration["PublicDms:WebhookUrl"] ?? "http://fastapi:8000";
+        var fastapiKey  = configuration["PublicDms:ApiKey"] ?? "";
+        services.AddHttpClient<IPublicDmsWebhookService, PublicDmsWebhookService>(client =>
+        {
+            client.BaseAddress = new Uri(fastapiUrl);
+            client.Timeout     = TimeSpan.FromSeconds(5);
+            if (!string.IsNullOrEmpty(fastapiKey))
+                client.DefaultRequestHeaders.Add("X-API-Key", fastapiKey);
+        });
+
+        var phpUrl = configuration["PublicDms:PhpSyncUrl"] ?? "http://php";
+        services.AddHttpClient<IPhpSyncService, PhpSyncService>(client =>
+        {
+            client.BaseAddress = new Uri(phpUrl);
+            client.Timeout     = TimeSpan.FromSeconds(5);
+        });
+
         return services;
     }
 }

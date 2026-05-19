@@ -56,26 +56,38 @@ async def _auto_sync_loop():
 
 @app.on_event("startup")
 async def on_startup():
-    # Índice de texto en MongoDB
     try:
         logger.info("Verificando índices en MongoDB...")
         existing = await collection.index_information()
+
+        # Drop ALL text indexes — forces clean rebuild when fields change
         for name, details in existing.items():
             is_text = any("_fts" in str(v) for v in details.get("key", []))
-            if is_text and name != "dms_master_index":
-                logger.info(f"Eliminando índice conflictivo: {name}")
+            if is_text:
+                logger.info(f"Eliminando índice de texto: {name}")
                 await collection.drop_index(name)
+
+        # Full-text index: title, code, category, department, file content
         await collection.create_index(
             [
                 ("title",           TEXT),
                 ("code",            TEXT),
                 ("category_name",   TEXT),
                 ("department_name", TEXT),
+                ("content",         TEXT),
             ],
             name="dms_master_index",
             default_language="spanish",
         )
-        logger.info("Índice 'dms_master_index' listo.")
+
+        # Supporting indexes for filtering / sorting
+        await collection.create_index("file_name")
+        await collection.create_index("extension")
+        await collection.create_index("metadata.tags")
+        await collection.create_index("created_at")
+        await collection.create_index("content_extracted")
+
+        logger.info("Índices MongoDB listos.")
     except Exception as e:
         logger.error(f"Error configurando índices: {e}")
 

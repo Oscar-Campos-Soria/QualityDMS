@@ -148,6 +148,9 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__QualityDMS: "Server=sqlserver,1433;Database=${MSSQL_DB:-QualityDMS};User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=True"
       Storage__LocalPath: /app/uploads
+      PublicDms__WebhookUrl: http://fastapi:8000
+      PublicDms__ApiKey: ${FASTAPI_API_KEY}
+      PublicDms__PhpSyncUrl: http://php
     ports:
       - "127.0.0.1:5000:8080"
     volumes:
@@ -185,6 +188,11 @@ services:
       SQL_PASSWORD:           ${MSSQL_SA_PASSWORD}
       FASTAPI_API_KEY:        ${FASTAPI_API_KEY}
       SYNC_INTERVAL_SECONDS:  ${SYNC_INTERVAL_SECONDS:-30}
+      DMS_STORAGE_PATH:       /app/uploads
+    volumes:
+      - uploads_data:/app/uploads:ro
+    ports:
+      - "127.0.0.1:8001:8000"   # dev only — FastAPI directo
     expose:
       - "8000"    # interno — accesible via nginx en /api/
     depends_on:

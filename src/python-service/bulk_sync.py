@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from database import get_sql_connection, collection, get_collection
+from extractor import MAX_CONTENT_CHARS, extract_text, get_file_info
 from models import PublicDMSMetadata
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ _STATE_ID  = "fastapi_auto_sync"
 _SQL_BASE = """
     SELECT
         d.DocumentId, d.Code, d.Title,
-        d.IsActive,
+        d.IsActive, d.CreatedAt, d.UpdatedAt,
         c.Name   AS Category,
         dep.Name AS Department,
         dv.VersionNumber, dv.FilePath
@@ -64,24 +65,52 @@ async def _index_rows(rows) -> int:
     now   = datetime.now(timezone.utc).isoformat()
     for row in rows:
         path = row.FilePath.replace("\\", "/").lstrip("/") if row.FilePath else ""
-        payload = PublicDMSMetadata(
-            postgres_id     = str(row.DocumentId),
-            code            = row.Code,
-            title           = row.Title,
-            category_name   = row.Category,
-            department_name = row.Department,
-            version         = str(row.VersionNumber),
-            file_url        = path,
-            is_active       = bool(row.IsActive),
-        ).model_dump()
-        payload["sync_date"] = now
+
+        file_info = get_file_info(path)
+        content, extraction_error = await asyncio.to_thread(extract_text, path)
+        if extraction_error:
+            logger.warning("Extraction [%s]: %s", path, extraction_error)
+
+        created_at = row.CreatedAt.isoformat() if getattr(row, "CreatedAt", None) else None
+        updated_at = row.UpdatedAt.isoformat() if getattr(row, "UpdatedAt", None) else None
+
+        payload = {
+            # backward-compat keys (search & PHP still use these)
+            "postgres_id":      str(row.DocumentId),
+            "code":             row.Code,
+            "title":            row.Title,
+            "category_name":    row.Category,
+            "department_name":  row.Department,
+            "version":          str(row.VersionNumber),
+            "file_url":         path,
+            "is_active":        bool(row.IsActive),
+            # document identity
+            "document_id":      str(row.DocumentId),
+            "created_at":       created_at,
+            "updated_at":       updated_at,
+            "uploaded_by":      "",
+            # structured metadata
+            "metadata": {
+                "department":   row.Department,
+                "tags":         [],
+                "version":      str(row.VersionNumber),
+            },
+            # file info (file_name, extension, mime_type, size, path)
+            **file_info,
+            # extracted content
+            "content":                  content[:MAX_CONTENT_CHARS],
+            "content_extracted":        extraction_error is None,
+            "content_extraction_error": extraction_error,
+            "sync_date":                now,
+        }
+
         await collection.update_one(
             {"postgres_id": payload["postgres_id"]},
             {"$set": payload},
             upsert=True,
         )
         count += 1
-        if count % 500 == 0:
+        if count % 100 == 0:
             logger.info(f"Indexados: {count}/{len(rows)}")
     return count
 
@@ -97,6 +126,31 @@ async def run_incremental_sync() -> int:
     await _set_last_sync(started)
     logger.info(f"Incremental sync: {count} docs indexados")
     return count
+
+
+def _fetch_by_id(document_id: int):
+    conn = get_sql_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(_SQL_BASE + " AND d.DocumentId = ?", document_id)
+        return cursor.fetchall()
+    finally:
+        conn.close()
+
+
+async def sync_single_document(document_id: int) -> bool:
+    """Index one document immediately — called by webhook on approval."""
+    try:
+        rows = await asyncio.to_thread(_fetch_by_id, document_id)
+        if not rows:
+            logger.warning(f"Document {document_id} not found or not approved in SQL Server")
+            return False
+        await _index_rows(rows)
+        logger.info(f"Webhook sync: document {document_id} indexed")
+        return True
+    except Exception as e:
+        logger.error(f"Webhook sync failed for document {document_id}: {e}", exc_info=True)
+        return False
 
 
 async def run_bulk_sync_from_sql() -> int:

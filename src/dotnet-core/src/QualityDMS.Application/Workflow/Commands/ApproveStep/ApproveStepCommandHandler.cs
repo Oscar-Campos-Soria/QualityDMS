@@ -12,7 +12,9 @@ public class ApproveStepCommandHandler(
     IWorkflowRepository workflowRepository,
     INotificationService notificationService,
     ICurrentUserService currentUser,
-    IUnitOfWork uow) : IRequestHandler<ApproveStepCommand, Result>
+    IUnitOfWork uow,
+    IPublicDmsWebhookService webhook,
+    IPhpSyncService phpSync) : IRequestHandler<ApproveStepCommand, Result>
 {
     public async Task<Result> Handle(ApproveStepCommand cmd, CancellationToken ct)
     {
@@ -39,8 +41,9 @@ public class ApproveStepCommandHandler(
 
         var steps = template.Steps.OrderBy(s => s.StepOrder).ToList();
         var nextStep = steps.FirstOrDefault(s => s.StepOrder > instance.CurrentStepOrder);
+        var fullyApproved = nextStep is null;
 
-        if (nextStep is null)
+        if (fullyApproved)
         {
             instance.Status = WorkflowStepStatus.Approved;
             instance.CompletedAt = DateTime.UtcNow;
@@ -57,7 +60,7 @@ public class ApproveStepCommandHandler(
         }
         else
         {
-            instance.CurrentStepOrder = nextStep.StepOrder;
+            instance.CurrentStepOrder = nextStep!.StepOrder;
             workflowRepository.UpdateInstance(instance);
 
             if (nextStep.AssignedUserId is not null)
@@ -72,6 +75,14 @@ public class ApproveStepCommandHandler(
         }
 
         await uow.SaveChangesAsync(ct);
+
+        // Notify FastAPI (MongoDB) and PHP (PostgreSQL) after DB commit
+        if (fullyApproved)
+        {
+            await webhook.NotifyDocumentApprovedAsync(document.DocumentId);
+            await phpSync.TriggerSyncAsync();
+        }
+
         return Result.Success();
     }
 }
