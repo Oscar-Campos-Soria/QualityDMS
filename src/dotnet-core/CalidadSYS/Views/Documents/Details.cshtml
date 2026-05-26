@@ -1,0 +1,136 @@
+@model QualityDMS.Application.Documents.DTOs.DocumentDetailDto
+@{
+    ViewData["Title"] = $"Documento {Model.Code}";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <a asp-action="Index" class="btn btn-sm btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <span class="badge @GetStatusBadge(Model.Status) fs-6">@Model.StatusName</span>
+    </div>
+    <div class="d-flex gap-2">
+        @if (Model.Status == DocumentStatus.Draft || Model.Status == DocumentStatus.Rejected)
+        {
+            <form asp-action="Submit" asp-route-id="@Model.DocumentId" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-primary"
+                        onclick="return confirm('¿Enviar este documento a aprobación?')">
+                    <i class="bi bi-send me-1"></i> Enviar a Aprobación
+                </button>
+            </form>
+        }
+        @if ((User.IsInRole("Admin") || User.IsInRole("QualityManager") || User.IsInRole("DocumentManager"))
+             && Model.Status != DocumentStatus.Approved && Model.Status != DocumentStatus.Obsolete)
+        {
+            <a asp-action="Edit" asp-route-id="@Model.DocumentId" class="btn btn-sm btn-warning">
+                <i class="bi bi-pencil me-1"></i> Editar
+            </a>
+        }
+        @if ((User.IsInRole("Admin") || User.IsInRole("QualityManager")) && Model.Status != DocumentStatus.Obsolete)
+        {
+            <form asp-action="Obsolete" asp-route-id="@Model.DocumentId" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('¿Marcar como obsoleto? Esta acción no se puede revertir.')">
+                    <i class="bi bi-archive me-1"></i> Obsoleto
+                </button>
+            </form>
+        }
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-sm-3 text-muted small fw-semibold">Código</div>
+                    <div class="col-sm-9"><span class="badge bg-light text-dark border fs-6">@Model.Code</span></div>
+                    <div class="col-sm-3 text-muted small fw-semibold">Título</div>
+                    <div class="col-sm-9 fw-semibold">@Model.Title</div>
+                    @if (!string.IsNullOrEmpty(Model.Description))
+                    {
+                        <div class="col-sm-3 text-muted small fw-semibold">Descripción</div>
+                        <div class="col-sm-9 small">@Model.Description</div>
+                    }
+                    <div class="col-sm-3 text-muted small fw-semibold">Categoría</div>
+                    <div class="col-sm-9 small">@Model.CategoryName</div>
+                    <div class="col-sm-3 text-muted small fw-semibold">Departamento</div>
+                    <div class="col-sm-9 small">@Model.DepartmentName</div>
+                    <div class="col-sm-3 text-muted small fw-semibold">Vigente desde</div>
+                    <div class="col-sm-9 small">@(Model.EffectiveDate?.ToString("dd/MM/yyyy") ?? "-")</div>
+                    <div class="col-sm-3 text-muted small fw-semibold">Expira</div>
+                    <div class="col-sm-9 small">@(Model.ExpirationDate?.ToString("dd/MM/yyyy") ?? "-")</div>
+                    <div class="col-sm-3 text-muted small fw-semibold">Próxima revisión</div>
+                    <div class="col-sm-9 small @(Model.NextReviewDate < DateTime.Today ? "text-danger fw-bold" : "")">
+                        @(Model.NextReviewDate?.ToString("dd/MM/yyyy") ?? "-")
+                    </div>
+                    <div class="col-sm-3 text-muted small fw-semibold">Creado por</div>
+                    <div class="col-sm-9 small">@Model.CreatedBy - @Model.CreatedAt.ToString("dd/MM/yyyy")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-2">
+                <h6 class="mb-0 small fw-bold">Historial de Versiones</h6>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.Versions.Any())
+                {
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Versión</th>
+                                <th>Archivo</th>
+                                <th>Fecha</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var v in Model.Versions.OrderByDescending(x => x.CreatedAt))
+                            {
+                                <tr class="@(v.IsCurrent ? "table-success" : "")">
+                                    <td>
+                                        @v.VersionNumber
+                                        @if (v.IsCurrent) { <span class="badge badge-approved ms-1">actual</span> }
+                                    </td>
+                                    <td class="small text-truncate" style="max-width:120px" title="@v.FileName">
+                                        @v.FileName
+                                    </td>
+                                    <td class="small text-muted">@v.CreatedAt.ToString("dd/MM/yy")</td>
+                                    <td>
+                                        <a asp-action="Download" asp-route-versionId="@v.VersionId"
+                                           class="btn btn-xs btn-outline-primary py-0 px-1"
+                                           title="Descargar">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted small p-3 mb-0">Sin versiones registradas.</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    string GetStatusBadge(DocumentStatus s) => s switch
+    {
+        DocumentStatus.Approved => "badge-approved",
+        DocumentStatus.PendingApproval => "badge-pending",
+        DocumentStatus.Rejected => "badge-rejected",
+        DocumentStatus.Obsolete => "badge-obsolete",
+        _ => "badge-draft"
+    };
+}

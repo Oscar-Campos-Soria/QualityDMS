@@ -1,0 +1,151 @@
+@model CreateDocumentViewModel
+@{
+    ViewData["Title"] = "Nuevo Documento";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-bold">
+                    <i class="bi bi-file-earmark-plus me-2 text-primary"></i>Nuevo Documento
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="errorAlert" class="alert alert-danger py-2 small d-none"></div>
+
+                <form id="createForm" enctype="multipart/form-data" novalidate>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label asp-for="Code" class="form-label fw-semibold small"></label>
+                            <input asp-for="Code" class="form-control" placeholder="DOC-001" required />
+                            <span asp-validation-for="Code" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-8">
+                            <label asp-for="Title" class="form-label fw-semibold small"></label>
+                            <input asp-for="Title" class="form-control" placeholder="Nombre del documento" required />
+                            <span asp-validation-for="Title" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Description" class="form-label fw-semibold small"></label>
+                            <textarea asp-for="Description" class="form-control" rows="3"
+                                      placeholder="Descripción del documento..."></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="CategoryId" class="form-label fw-semibold small"></label>
+                            <select asp-for="CategoryId" asp-items="Model.Categories" class="form-select" required>
+                                <option value="">-- Seleccionar categoría --</option>
+                            </select>
+                            <span asp-validation-for="CategoryId" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="DepartmentId" class="form-label fw-semibold small"></label>
+                            <select asp-for="DepartmentId" asp-items="Model.Departments" class="form-select" required>
+                                <option value="">-- Seleccionar departamento --</option>
+                            </select>
+                            <span asp-validation-for="DepartmentId" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="WorkflowTemplateId" class="form-label fw-semibold small"></label>
+                            <select asp-for="WorkflowTemplateId" asp-items="Model.WorkflowTemplates" class="form-select">
+                                <option value="">-- Sin flujo de aprobación --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="NextReviewDate" class="form-label fw-semibold small"></label>
+                            <input asp-for="NextReviewDate" class="form-control" type="date" />
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="File" class="form-label fw-semibold small"></label>
+                            <input asp-for="File" class="form-control" type="file"
+                                   accept=".pdf,.docx,.xlsx,.pbix,.dwg,.dxf" required />
+                            <div class="form-text">
+                                PDF, Word (.docx), Excel (.xlsx), Power BI (.pbix), AutoCAD (.dwg, .dxf). Máx. 50 MB.
+                            </div>
+                            <span asp-validation-for="File" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" id="submitBtn" class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i> Crear Documento
+                        </button>
+                        <a href="/Documents" class="btn btn-outline-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    document.getElementById('createForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const btn = document.getElementById('submitBtn');
+        const errorAlert = document.getElementById('errorAlert');
+        errorAlert.classList.add('d-none');
+        errorAlert.textContent = '';
+
+        const file = this.querySelector('input[type="file"]').files[0];
+        if (!file) {
+            errorAlert.textContent = 'Debe seleccionar un archivo.';
+            errorAlert.classList.remove('d-none');
+            return;
+        }
+
+        const allowed = ['.pdf', '.docx', '.xlsx', '.pbix', '.dwg', '.dxf'];
+        const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+        if (!allowed.includes(ext)) {
+            errorAlert.textContent = `Extensión "${ext}" no permitida. Use: ${allowed.join(', ')}`;
+            errorAlert.classList.remove('d-none');
+            return;
+        }
+
+        if (file.size > 52428800) {
+            errorAlert.textContent = 'El archivo excede el límite de 50 MB.';
+            errorAlert.classList.remove('d-none');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Creando...';
+
+        try {
+            const formData = new FormData(this);
+
+            const response = await fetch('/api/v1/Documents', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.status === 201 || response.ok) {
+                const data = await response.json();
+                window.location.href = `/Documents/Details/${data.id}`;
+                return;
+            }
+
+            const ct = response.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+                const err = await response.json();
+                if (err.errors) {
+                    errorAlert.textContent = Object.values(err.errors).flat().join(' ');
+                } else {
+                    errorAlert.textContent = err.error || err.title || 'Error al crear el documento.';
+                }
+            } else {
+                errorAlert.textContent = `Error ${response.status}: ${response.statusText}`;
+            }
+            errorAlert.classList.remove('d-none');
+
+        } catch (err) {
+            errorAlert.textContent = 'Error de conexión: ' + err.message;
+            errorAlert.classList.remove('d-none');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-save me-1"></i> Crear Documento';
+        }
+    });
+</script>
+}

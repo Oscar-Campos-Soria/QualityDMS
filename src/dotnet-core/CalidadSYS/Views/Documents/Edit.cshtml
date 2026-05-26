@@ -1,0 +1,93 @@
+@model EditDocumentViewModel
+@{
+    ViewData["Title"] = "Editar Documento";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-bold">
+                    <i class="bi bi-pencil-square me-2 text-warning"></i>
+                    Editar: <span class="text-primary">@Model.Code</span>
+                </h6>
+            </div>
+            <div class="card-body">
+                <form asp-action="Edit" method="post" enctype="multipart/form-data">
+                    <input type="hidden" asp-for="DocumentId" />
+                    <input type="hidden" asp-for="Code" />
+                    <input type="hidden" asp-for="CurrentStatus" />
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small"></div>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label asp-for="Title" class="form-label fw-semibold small"></label>
+                            <input asp-for="Title" class="form-control" />
+                            <span asp-validation-for="Title" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Description" class="form-label fw-semibold small"></label>
+                            <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="CategoryId" class="form-label fw-semibold small"></label>
+                            <select asp-for="CategoryId" asp-items="Model.Categories" class="form-select">
+                                <option value="">-- Seleccionar --</option>
+                            </select>
+                            <span asp-validation-for="CategoryId" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="DepartmentId" class="form-label fw-semibold small"></label>
+                            <select asp-for="DepartmentId" asp-items="Model.Departments" class="form-select">
+                                <option value="">-- Seleccionar --</option>
+                            </select>
+                            <span asp-validation-for="DepartmentId" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="WorkflowTemplateId" class="form-label fw-semibold small"></label>
+                            <select asp-for="WorkflowTemplateId" asp-items="Model.WorkflowTemplates" class="form-select">
+                                <option value="">-- Sin flujo --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="NextReviewDate" class="form-label fw-semibold small"></label>
+                            <input asp-for="NextReviewDate" class="form-control" type="date" />
+                        </div>
+
+                        <div class="col-12"><hr class="my-0" /></div>
+                        <div class="col-12">
+                            <h6 class="fw-semibold small text-muted text-uppercase">Nueva Versión (opcional)</h6>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="NewVersionNumber" class="form-label fw-semibold small"></label>
+                            <input asp-for="NewVersionNumber" class="form-control" placeholder="1.1" />
+                        </div>
+                        <div class="col-md-8">
+                            <label asp-for="ChangeLog" class="form-label fw-semibold small"></label>
+                            <input asp-for="ChangeLog" class="form-control" placeholder="Descripción de los cambios..." />
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="File" class="form-label fw-semibold small"></label>
+                            <input asp-for="File" class="form-control" type="file"
+                                   accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
+                            <div class="form-text">Deja vacío para mantener el archivo actual.</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-save me-1"></i> Guardar Cambios
+                        </button>
+                        <a asp-action="Details" asp-route-id="@Model.DocumentId" class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

@@ -1,12 +1,20 @@
 # .NET build artifacts
 src/dotnet-core/**/bin/
 src/dotnet-core/**/obj/
+src/dotnet-core/**/*.csproj.user
+src/dotnet-core/CalidadSYS/wwwroot/lib/
+src/dotnet-core/CalidadSYS/uploads/
 
 # Python
 src/python-service/__pycache__/
 src/python-service/**/__pycache__/
 src/python-service/.venv/
 src/python-service/*.pyc
+src/moduloDMS/__pycache__/
+src/moduloDMS/**/__pycache__/
+src/moduloDMS/.venv/
+src/moduloDMS/*.pyc
+src/moduloDMS/.env
 
 # PHP
 src/php-app/storage/pdfs/
