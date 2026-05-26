@@ -4,6 +4,7 @@ using Microsoft.OpenApi.Models;
 using QualityDMS.Application;
 using QualityDMS.Application.Common.Exceptions;
 using QualityDMS.Infrastructure;
+using QualityDMS.Infrastructure.Persistence;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -135,5 +136,11 @@ app.MapControllerRoute(
     .WithStaticAssets();
 
 app.MapControllers();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<QualityDMSDbContext>();
+    db.Database.EnsureCreated();
+}
 
 app.Run();

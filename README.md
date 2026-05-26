@@ -6,7 +6,7 @@ Sistema multi-stack para gestión, aprobación y consulta pública de documentos
 
 ```
 ┌─────────────────────┐     webhook      ┌──────────────────────┐
-│   CalidadSYS        │ ───────────────▶ │   moduloDMS           │
+│   CalidadSYS        │ ───────────────▶ │   python-service      │
 │   ASP.NET Core 10   │                  │   FastAPI + MongoDB   │
 │   + SQL Server 2022 │ ───────────────▶ │   Indexación +        │
 └─────────────────────┘     webhook      │   Extracción texto    │
@@ -27,7 +27,7 @@ Sistema multi-stack para gestión, aprobación y consulta pública de documentos
 | Servicio       | Tecnología              | Puerto (host) | Rol                                        |
 |----------------|-------------------------|---------------|--------------------------------------------|
 | CalidadSYS     | ASP.NET Core 10 MVC     | 5000          | Gestión de documentos, workflows, uploads  |
-| moduloDMS      | FastAPI + Python 3.12   | 8001          | Indexación MongoDB, extracción texto, búsqueda full-text |
+| python-service | FastAPI + Python 3.12   | 8001          | Indexación MongoDB, extracción texto, búsqueda full-text |
 | PublicDMS      | PHP 8.3 + Apache        | 80 / 8443     | Portal de consulta pública                 |
 | SQL Server     | SQL Server 2022         | 1434          | Base de datos maestra                      |
 | PostgreSQL     | PostgreSQL 16           | 5433          | Metadatos sincronizados (PublicDMS)        |
@@ -56,8 +56,6 @@ Sistema multi-stack para gestión, aprobación y consulta pública de documentos
 └── README.md
 ```
 
-> **Nota:** Los módulos CalidadSYS y moduloDMS deben copiarse en `src/dotnet-core/` y `src/python-service/` respectivamente antes de ejecutar el setup.
-
 ## Requisitos
 
 - Docker Desktop 4.x o superior
@@ -69,27 +67,20 @@ Sistema multi-stack para gestión, aprobación y consulta pública de documentos
 ### Opción A — Setup automático (recomendado)
 
 ```powershell
-git clone <URL_DEL_REPO> PublicDMS
+git clone https://github.com/Ero-2/Sistema-Gestion-Documental.git PublicDMS
 cd PublicDMS
-
-# Copiar fuentes
-cp -r /ruta/a/CalidadSYS/* src/dotnet-core/
-cp -r /ruta/a/moduloDMS/* src/python-service/
 
 # Setup interactivo: genera .env y levanta todo
 .\setup.ps1
 ```
 
-El script pide una contraseña maestra (mín. 6 caracteres), genera `.env` automáticamente con API key aleatoria y levanta todos los contenedores.
+El script pide una contraseña maestra (mín. 6 caracteres), genera `.env` automáticamente con API key aleatoria y levanta todos los contenedores. La base de datos SQL Server se inicializa automáticamente al primer arranque.
 
 ### Opción B — Setup manual
 
 ```powershell
-git clone <URL_DEL_REPO> PublicDMS
+git clone https://github.com/Ero-2/Sistema-Gestion-Documental.git PublicDMS
 cd PublicDMS
-
-cp -r /ruta/a/CalidadSYS/* src/dotnet-core/
-cp -r /ruta/a/moduloDMS/* src/python-service/
 
 cp .env.example .env
 # Editar .env con tus contraseñas
@@ -183,7 +174,7 @@ Archivos con formato no soportado se indexan con solo metadatos (sin contenido).
 
 ## Desarrollo local (sin Docker)
 
-### FastAPI (moduloDMS)
+### FastAPI (python-service)
 ```powershell
 cd src/python-service
 python -m venv .venv
@@ -197,7 +188,7 @@ Requiere XAMPP con PHP 8.3, extensiones `pdo_pgsql` y `pdo_sqlsrv`.
 Ajustar `config/storage.php` con la ruta local a los uploads de CalidadSYS.
 
 ### CalidadSYS
-Abrir `src/dotnet-core/CalidadSYS.sln` en Visual Studio 2022 y ejecutar con F5.
+Abrir `src/dotnet-core/CalidadSYS/CalidadSYS.csproj` en Visual Studio 2022 y ejecutar con F5.
 
 ## Gestión de contenedores
 
