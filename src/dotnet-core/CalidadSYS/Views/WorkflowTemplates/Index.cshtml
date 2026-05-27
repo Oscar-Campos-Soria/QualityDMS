@@ -1,0 +1,67 @@
+@model IEnumerable<QualityDMS.Domain.Entities.WorkflowTemplate>
+@{
+    ViewData["Title"] = "Plantillas de Workflow";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold">Plantillas de Workflow</h5>
+    <a asp-action="Create" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i> Nueva Plantilla
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Descripción</th>
+                    <th class="text-center">Pasos</th>
+                    <th>Estado</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Model)
+                {
+                    <tr>
+                        <td class="fw-semibold">@t.Name</td>
+                        <td class="small text-muted">@(t.Description ?? "-")</td>
+                        <td class="text-center">
+                            <span class="badge @(t.Steps.Any() ? "bg-primary" : "bg-danger")">
+                                @t.Steps.Count
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge @(t.IsActive ? "badge-approved" : "badge-obsolete")">
+                                @(t.IsActive ? "Activo" : "Inactivo")
+                            </span>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <a asp-action="Steps" asp-route-id="@t.WorkflowTemplateId"
+                                   class="btn btn-sm btn-outline-primary py-0 px-2" title="Gestionar pasos">
+                                    <i class="bi bi-diagram-3"></i>
+                                </a>
+                                <a asp-action="Edit" asp-route-id="@t.WorkflowTemplateId"
+                                   class="btn btn-sm btn-outline-warning py-0 px-2" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a asp-action="Delete" asp-route-id="@t.WorkflowTemplateId"
+                                   class="btn btn-sm btn-outline-danger py-0 px-2" title="Eliminar">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-4">No hay plantillas registradas.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @await Html.PartialAsync("_Pagination", ViewBag.Pagination as PaginationViewModel)
+</div>

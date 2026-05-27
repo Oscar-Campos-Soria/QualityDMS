@@ -1,0 +1,207 @@
+# Sistema Integral de Gestión Documental (DMS)
+
+Sistema multi-stack para gestión, aprobación y consulta pública de documentos normativos.
+
+## Arquitectura
+
+```
+┌─────────────────────┐     webhook      ┌──────────────────────┐
+│   CalidadSYS        │ ───────────────▶ │   python-service      │
+│   ASP.NET Core 10   │                  │   FastAPI + MongoDB   │
+│   + SQL Server 2022 │ ───────────────▶ │   Indexación +        │
+└─────────────────────┘     webhook      │   Extracción texto    │
+         │                               └──────────────────────┘
+         │ webhook                                ▲
+         ▼                                        │ búsqueda
+┌─────────────────────┐                           │
+│   PublicDMS         │ ──────────────────────────┘
+│   PHP 8 + PostgreSQL│
+│   Consulta Pública  │
+└─────────────────────┘
+         │
+         └─────────────── uploads_data (volumen compartido, solo lectura) ───────┐
+                                                                                  │
+                                                              CalidadSYS (escribe)┘
+```
+
+| Servicio       | Tecnología              | Puerto (host) | Rol                                        |
+|----------------|-------------------------|---------------|--------------------------------------------|
+| CalidadSYS     | ASP.NET Core 10 MVC     | 5000          | Gestión de documentos, workflows, uploads  |
+| python-service | FastAPI + Python 3.12   | 8001          | Indexación MongoDB, extracción texto, búsqueda full-text |
+| PublicDMS      | PHP 8.3 + Apache        | 80 / 8443     | Portal de consulta pública                 |
+| SQL Server     | SQL Server 2022         | 1434          | Base de datos maestra                      |
+| PostgreSQL     | PostgreSQL 16           | 5433          | Metadatos sincronizados (PublicDMS)        |
+| MongoDB        | MongoDB 7               | 27018         | Índice full-text de documentos             |
+| Nginx          | Nginx                   | 80 / 8443     | Reverse proxy + HTTPS                      |
+
+## Estructura del repositorio
+
+```
+/
+├── src/
+│   ├── dotnet-core/        ← Código fuente CalidadSYS (ASP.NET Core)
+│   ├── php-app/            ← Módulo PHP PublicDMS
+│   └── python-service/     ← Código fuente moduloDMS (FastAPI)
+├── db/
+│   ├── postgres/           ← Schema PostgreSQL (auto-ejecutado en primer arranque)
+│   ├── mongo/              ← Init MongoDB (auto-ejecutado en primer arranque)
+│   └── sqlserver/          ← Instrucciones para exportar schema SQL Server
+├── docker/
+│   ├── php-app/            ← Dockerfile + config Apache + crontab
+│   ├── python-service/     ← Dockerfile FastAPI
+│   └── dotnet-core/        ← Dockerfile .NET 10 multi-stage
+├── docker-compose.yml
+├── .env.example
+├── setup.ps1               ← Script de setup automatizado (Windows)
+└── README.md
+```
+
+## Requisitos
+
+- Docker Desktop 4.x o superior
+- Git
+- 8 GB RAM disponibles para los contenedores
+
+## Configuración inicial
+
+### Opción A — Setup automático (recomendado)
+
+```powershell
+git clone https://github.com/Ero-2/Sistema-Gestion-Documental.git PublicDMS
+cd PublicDMS
+
+# Setup interactivo: genera .env y levanta todo
+.\setup.ps1
+```
+
+El script pide una contraseña maestra (mín. 6 caracteres), genera `.env` automáticamente con API key aleatoria y levanta todos los contenedores. La base de datos SQL Server se inicializa automáticamente al primer arranque.
+
+### Opción B — Setup manual
+
+```powershell
+git clone https://github.com/Ero-2/Sistema-Gestion-Documental.git PublicDMS
+cd PublicDMS
+
+cp .env.example .env
+# Editar .env con tus contraseñas
+
+docker compose up -d --build
+```
+
+Variables requeridas en `.env`:
+
+| Variable            | Descripción                  | Ejemplo               |
+|---------------------|------------------------------|-----------------------|
+| `MSSQL_SA_PASSWORD` | Contraseña SA de SQL Server  | `MiPass1@`            |
+| `MSSQL_DB`          | Nombre BD SQL Server         | `QualityDMS`          |
+| `POSTGRES_PASSWORD` | Contraseña PostgreSQL        | `mipassword`          |
+| `MONGO_PASSWORD`    | Contraseña MongoDB           | `mipassword`          |
+| `FASTAPI_API_KEY`   | API key para FastAPI         | `clave-secreta-hex`   |
+
+## URLs del sistema
+
+| Servicio              | URL                            |
+|-----------------------|--------------------------------|
+| Portal PublicDMS      | http://localhost               |
+| Portal PublicDMS HTTPS| https://localhost:8443         |
+| CalidadSYS            | http://localhost:5000          |
+| CalidadSYS Swagger    | http://localhost:5000/swagger  |
+| FastAPI Docs          | http://localhost:8001/docs     |
+
+## Verificar que todo está correcto
+
+```powershell
+# Estado de contenedores
+docker compose ps
+
+# Logs en tiempo real
+docker compose logs -f
+
+# Health checks individuales
+curl http://localhost/
+curl http://localhost:8001/health
+curl http://localhost:5000/
+```
+
+## Flujo de datos
+
+```
+1. Upload y aprobación
+   CalidadSYS sube PDF/DOCX/etc → uploads_data (volumen compartido)
+   CalidadSYS registra en SQL Server (DocumentVersions.FilePath)
+   Documento aprobado → CalidadSYS dispara dos webhooks en paralelo:
+     → POST http://fastapi:8000/indexer/notify  (indexación inmediata MongoDB)
+     → POST http://php/sync/trigger_sync.php    (sync inmediato PostgreSQL)
+
+2. Indexación (FastAPI — < 2 segundos tras aprobación)
+   Lee documento de SQL Server
+   Extrae texto del archivo (PDF→PyMuPDF, DOCX→python-docx, TXT, XLSX→openpyxl)
+   Guarda metadatos + contenido en MongoDB
+   Auto-sync cada 30s como respaldo
+
+3. Sincronización PostgreSQL (PHP — < 3 segundos tras aprobación)
+   sync_docs.php lee SQL Server → sincroniza a PostgreSQL
+   Cron cada 5 min como respaldo
+
+4. Consulta pública
+   Usuario busca → PHP llama FastAPI /indexer/search?q=...
+   MongoDB full-text search → devuelve postgres_ids
+   PHP consulta PostgreSQL con esos ids → muestra resultados
+   Descarga PDF → view_pdf.php → uploads_data (solo lectura)
+```
+
+## Formatos soportados para indexación de contenido
+
+| Formato | Extensión       | Librería            |
+|---------|-----------------|---------------------|
+| PDF     | .pdf            | PyMuPDF             |
+| Word    | .docx           | python-docx         |
+| Word    | .doc            | antiword (sistema)  |
+| Excel   | .xlsx           | openpyxl            |
+| Excel   | .xls            | xlrd                |
+| PowerPoint | .pptx        | python-pptx         |
+| PowerPoint | .ppt         | catppt (sistema)    |
+| Texto   | .txt / .md      | nativo + chardet    |
+| RTF     | .rtf            | striprtf            |
+| OpenDoc | .odt / .ods / .odp | odfpy            |
+| CSV     | .csv            | nativo              |
+| Web     | .html / .htm    | beautifulsoup4      |
+| XML     | .xml            | lxml                |
+| Email   | .eml            | nativo email lib    |
+| Outlook | .msg            | extract-msg         |
+
+Archivos con formato no soportado se indexan con solo metadatos (sin contenido).
+
+## Desarrollo local (sin Docker)
+
+### FastAPI (python-service)
+```powershell
+cd src/python-service
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+### PHP (PublicDMS)
+Requiere XAMPP con PHP 8.3, extensiones `pdo_pgsql` y `pdo_sqlsrv`.
+Ajustar `config/storage.php` con la ruta local a los uploads de CalidadSYS.
+
+### CalidadSYS
+Abrir `src/dotnet-core/CalidadSYS/CalidadSYS.csproj` en Visual Studio 2022 y ejecutar con F5.
+
+## Gestión de contenedores
+
+```powershell
+# Detener (conserva datos)
+docker compose down
+
+# Detener y BORRAR todos los datos (irreversible)
+docker compose down -v
+
+# Reconstruir un servicio específico
+docker compose up -d --build fastapi
+
+# Ver logs de un servicio
+docker compose logs -f fastapi
+```

@@ -1,0 +1,41 @@
+# ── PHP 8.3 + Apache + SQL Server + PostgreSQL drivers ──
+FROM php:8.3-apache
+
+# Dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    curl gnupg2 apt-transport-https \
+    libpq-dev unixodbc-dev cron \
+    && rm -rf /var/lib/apt/lists/*
+
+# Microsoft ODBC Driver 17 (requerido por pdo_sqlsrv)
+RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
+    && curl https://packages.microsoft.com/config/debian/12/prod.list \
+       > /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update \
+    && ACCEPT_EULA=Y apt-get install -y msodbcsql17 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Extensiones PHP
+RUN pecl install sqlsrv pdo_sqlsrv \
+    && docker-php-ext-install pdo pdo_pgsql \
+    && docker-php-ext-enable sqlsrv pdo_sqlsrv pdo_pgsql
+
+# Habilitar mod_rewrite
+RUN a2enmod rewrite
+
+# Crontab — sync incremental cada 5 minutos
+COPY docker/php-app/crontab /etc/cron.d/dms-sync
+RUN chmod 0644 /etc/cron.d/dms-sync && crontab /etc/cron.d/dms-sync
+
+# Código de la app
+COPY . /var/www/html/
+
+# VirtualHost
+COPY docker/php-app/apache.conf /etc/apache2/sites-available/000-default.conf
+
+# Script de inicio (cron + apache)
+COPY docker/php-app/start.sh /start.sh
+RUN chmod +x /start.sh
+
+EXPOSE 80
+CMD ["/start.sh"]

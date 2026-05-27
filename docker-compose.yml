@@ -1,0 +1,274 @@
+# ══════════════════════════════════════════════════════════
+#  Sistema Integral de Gestión Documental — Multi-Stack
+#  Servicios: SQL Server · PostgreSQL · MongoDB
+#             .NET 10 · PHP 8 · FastAPI (Python) · Nginx
+# ══════════════════════════════════════════════════════════
+
+services:
+
+  # ──────────────────────────────────────────────────────
+  # Nginx — Reverse proxy + HTTPS (cert self-signed)
+  # ──────────────────────────────────────────────────────
+  nginx:
+    build:
+      context: ./docker/nginx
+    container_name: dms_nginx
+    ports:
+      - "80:80"
+      - "8443:443"   # 443 ocupado por XAMPP SSL → expuesto en 8443
+    depends_on:
+      - php
+      - fastapi
+    networks:
+      - dms_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+
+  # ──────────────────────────────────────────────────────
+  # SQL Server 2022 — Fuente maestra (CalidadSYS)
+  # ──────────────────────────────────────────────────────
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: dms_sqlserver
+    environment:
+      SA_PASSWORD:  ${MSSQL_SA_PASSWORD}
+      ACCEPT_EULA:  "Y"
+      MSSQL_PID:    Developer
+    ports:
+      - "127.0.0.1:1434:1433"   # 1433 ocupado localmente → expuesto en 1434
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL",
+             "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${MSSQL_SA_PASSWORD}' -Q 'SELECT 1' -No || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - dms_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+
+  # ──────────────────────────────────────────────────────
+  # PostgreSQL 16 — Módulo PublicDMS
+  # ──────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: dms_postgres
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-PublicDMS}
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5433:5432"   # 5432 ocupado localmente → expuesto en 5433
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-PublicDMS}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dms_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # ──────────────────────────────────────────────────────
+  # MongoDB 7 — Motor de búsqueda / indexación
+  # ──────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: dms_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-mongoadmin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE:      dms_metadata
+    ports:
+      - "127.0.0.1:27018:27017"  # 27017 ocupado localmente → expuesto en 27018
+    volumes:
+      - mongo_data:/data/db
+      - ./db/mongo:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dms_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # ──────────────────────────────────────────────────────
+  # .NET Core 10 — Módulo Central (CalidadSYS)
+  # ──────────────────────────────────────────────────────
+  dotnet:
+    build:
+      context: ./src/dotnet-core
+    container_name: dms_dotnet
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__QualityDMS: "Server=sqlserver,1433;Database=${MSSQL_DB:-QualityDMS};User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=True"
+      Storage__LocalPath: /app/uploads
+      PublicDms__WebhookUrl: http://fastapi:8000
+      PublicDms__ApiKey: ${FASTAPI_API_KEY}
+      PublicDms__PhpSyncUrl: http://php
+    ports:
+      - "127.0.0.1:5000:8080"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - dms_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+  # ──────────────────────────────────────────────────────
+  # FastAPI (Python 3.12) — Indexación y Metadatos
+  # ──────────────────────────────────────────────────────
+  fastapi:
+    build:
+      context: ./src/python-service
+    container_name: dms_fastapi
+    environment:
+      MONGO_URL:              mongodb://${MONGO_USER:-mongoadmin}:${MONGO_PASSWORD}@mongodb:27017/?authSource=admin
+      DATABASE_NAME:          dms_metadata
+      SQL_SERVER:             sqlserver
+      SQL_DATABASE:           ${MSSQL_DB:-QualityDMS}
+      SQL_USER:               sa
+      SQL_PASSWORD:           ${MSSQL_SA_PASSWORD}
+      FASTAPI_API_KEY:        ${FASTAPI_API_KEY}
+      SYNC_INTERVAL_SECONDS:  ${SYNC_INTERVAL_SECONDS:-30}
+      DMS_STORAGE_PATH:       /app/uploads
+    volumes:
+      - uploads_data:/app/uploads:ro
+    ports:
+      - "127.0.0.1:8001:8000"   # dev only — FastAPI directo
+    expose:
+      - "8000"    # interno — accesible via nginx en /api/
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - dms_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ──────────────────────────────────────────────────────
+  # PHP 8.3 + Apache — Módulo PublicDMS (Consulta Pública)
+  # Incluye cron para sync incremental automático cada 5 min
+  # ──────────────────────────────────────────────────────
+  php:
+    build:
+      context: ./src/php-app
+    container_name: dms_php
+    environment:
+      POSTGRES_HOST:      postgres
+      POSTGRES_DB:        ${POSTGRES_DB:-PublicDMS}
+      POSTGRES_USER:      ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD:  ${POSTGRES_PASSWORD}
+      SQLSERVER_HOST:     sqlserver
+      SQLSERVER_DB:       ${MSSQL_DB:-QualityDMS}
+      SQLSERVER_USER:     sa
+      SQLSERVER_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DMS_STORAGE_PATH:   /var/dms/uploads
+      FASTAPI_URL:        http://fastapi:8000
+      FASTAPI_API_KEY:    ${FASTAPI_API_KEY}
+    expose:
+      - "80"      # interno — nginx lo expone en 443
+    volumes:
+      - uploads_data:/var/dms/uploads:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      fastapi:
+        condition: service_started
+    networks:
+      - dms_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+# ══════════════════════════════════════════════════════════
+#  Volúmenes
+# ══════════════════════════════════════════════════════════
+volumes:
+  sqlserver_data:
+  postgres_data:
+  mongo_data:
+  uploads_data:
+
+# ══════════════════════════════════════════════════════════
+#  Red interna
+# ══════════════════════════════════════════════════════════
+networks:
+  dms_net:
+    driver: bridge

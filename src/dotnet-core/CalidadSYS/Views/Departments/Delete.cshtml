@@ -1,0 +1,31 @@
+@model QualityDMS.Domain.Entities.Department
+@{
+    ViewData["Title"] = "Eliminar Departamento";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-5">
+        <div class="card border-danger border-0 shadow-sm">
+            <div class="card-header bg-danger text-white py-3">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación</h6>
+            </div>
+            <div class="card-body">
+                <p>¿Desea eliminar el departamento?</p>
+                <div class="bg-light rounded p-3 mb-3">
+                    <strong>@Model.Code</strong> — @Model.Name
+                </div>
+                <div class="alert alert-warning small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Si el departamento tiene documentos asociados, no podrá eliminarse.
+                </div>
+                <form asp-action="Delete" asp-route-id="@Model.DepartmentId" method="post" class="d-flex gap-2">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i> Eliminar
+                    </button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
